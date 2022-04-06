@@ -37,6 +37,9 @@ import {
   getIconForVisualizationType,
 } from "metabase/visualizations";
 
+import MetabaseSettings from "metabase/lib/settings";
+import { IFRAMED } from "metabase/lib/dom";
+
 const ViewFooter = ({
   question,
   result,
@@ -74,6 +77,10 @@ const ViewFooter = ({
     return null;
   }
 
+  const allowAlerts =
+    !IFRAMED || MetabaseSettings.get("embedding-view-allow-alerts");
+  const allowEditing =
+    !IFRAMED || MetabaseSettings.get("embedding-view-allow-editing");
   const hasDataPermission = question.query().isEditable();
 
   return (
@@ -107,7 +114,7 @@ const ViewFooter = ({
               onCloseSummary={onCloseSummary}
             />
           ),
-          hasDataPermission && (
+          allowEditing && hasDataPermission && (
             <VizTypeButton
               key="viz-type"
               question={question}
@@ -118,7 +125,7 @@ const ViewFooter = ({
               }
             />
           ),
-          hasDataPermission && (
+          allowEditing && hasDataPermission && (
             <VizSettingsButton
               key="viz-settings"
               ml={1}
@@ -172,23 +179,24 @@ const ViewFooter = ({
               visualizationSettings={visualizationSettings}
             />
           ),
-          QuestionAlertWidget.shouldRender({
-            question,
-            visualizationSettings,
-          }) && (
-            <QuestionAlertWidget
-              key="alerts"
-              className="mx1 hide sm-show"
-              canManageSubscriptions={canManageSubscriptions}
-              question={question}
-              questionAlerts={questionAlerts}
-              onCreateAlert={() =>
-                question.isSaved()
-                  ? onOpenModal("create-alert")
-                  : onOpenModal("save-question-before-alert")
-              }
-            />
-          ),
+          allowAlerts &&
+            QuestionAlertWidget.shouldRender({
+              question,
+              visualizationSettings,
+            }) && (
+              <QuestionAlertWidget
+                key="alerts"
+                className="mx1 hide sm-show"
+                canManageSubscriptions={canManageSubscriptions}
+                question={question}
+                questionAlerts={questionAlerts}
+                onCreateAlert={() =>
+                  question.isSaved()
+                    ? onOpenModal("create-alert")
+                    : onOpenModal("save-question-before-alert")
+                }
+              />
+            ),
           QuestionEmbedWidget.shouldRender({ question, isAdmin }) && (
             <QuestionEmbedWidgetTrigger
               key="embeds"

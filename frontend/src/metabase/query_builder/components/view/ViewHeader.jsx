@@ -43,6 +43,7 @@ import {
   StyledCollectionBadge,
   StyledQuestionDataSource,
 } from "./ViewHeader.styled";
+import { IFRAMED } from "metabase/lib/dom";
 
 const viewTitleHeaderPropTypes = {
   question: PropTypes.object.isRequired,
@@ -404,13 +405,17 @@ function ViewTitleHeaderRightSide(props) {
     isSaved &&
     canRunAdhocQueries &&
     MetabaseSettings.get("enable-nested-queries");
+  const allowSave =
+    !IFRAMED || MetabaseSettings.get("embedding-view-allow-save");
+  const allowEditing =
+    !IFRAMED || MetabaseSettings.get("embedding-view-allow-editing");
 
   return (
     <div
       className="ml-auto flex align-center"
       data-testid="qb-header-action-panel"
     >
-      {!!isDirty && !isDataset && (
+      {allowSave && !!isDirty && !isDataset && (
         <SaveButton
           disabled={!question.canRun()}
           data-metabase-event={
@@ -452,7 +457,7 @@ function ViewTitleHeaderRightSide(props) {
           data-metabase-event={`View Mode; Open Summary Widget`}
         />
       )}
-      {QuestionNotebookButton.shouldRender({ question }) && (
+      {allowEditing && QuestionNotebookButton.shouldRender({ question }) && (
         <QuestionNotebookButton
           className="hide sm-show"
           ml={2}
