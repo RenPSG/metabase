@@ -37,6 +37,9 @@ import {
   getIconForVisualizationType,
 } from "metabase/visualizations";
 
+import MetabaseSettings from "metabase/lib/settings";
+import { IFRAMED } from "metabase/lib/dom";
+
 const ViewFooter = ({
   question,
   result,
@@ -74,6 +77,11 @@ const ViewFooter = ({
     return null;
   }
 
+  const allowAlerts =
+    !IFRAMED || MetabaseSettings.get("embedding-view-allow-alerts");
+  const allowEditing =
+    !IFRAMED || MetabaseSettings.get("embedding-view-allow-editing");
+
   return (
     <ViewFooterRoot
       className={cx(className, "text-medium border-top")}
@@ -105,26 +113,30 @@ const ViewFooter = ({
               onCloseSummary={onCloseSummary}
             />
           ),
-          <VizTypeButton
-            key="viz-type"
-            question={question}
-            result={result}
-            active={isShowingChartTypeSidebar}
-            onClick={
-              isShowingChartTypeSidebar ? onCloseChartType : onOpenChartType
-            }
-          />,
-          <VizSettingsButton
-            key="viz-settings"
-            ml={1}
-            mr={[3, 0]}
-            active={isShowingChartSettingsSidebar}
-            onClick={
-              isShowingChartSettingsSidebar
-                ? onCloseChartSettings
-                : onOpenChartSettings
-            }
-          />,
+          allowEditing && (
+            <VizTypeButton
+              key="viz-type"
+              question={question}
+              result={result}
+              active={isShowingChartTypeSidebar}
+              onClick={
+                isShowingChartTypeSidebar ? onCloseChartType : onOpenChartType
+              }
+            />
+          ),
+          allowEditing && (
+            <VizSettingsButton
+              key="viz-settings"
+              ml={1}
+              mr={[3, 0]}
+              active={isShowingChartSettingsSidebar}
+              onClick={
+                isShowingChartSettingsSidebar
+                  ? onCloseChartSettings
+                  : onOpenChartSettings
+              }
+            />
+          ),
         ]}
         center={
           isVisualized && (
@@ -166,23 +178,24 @@ const ViewFooter = ({
               visualizationSettings={visualizationSettings}
             />
           ),
-          QuestionAlertWidget.shouldRender({
-            question,
-            visualizationSettings,
-          }) && (
-            <QuestionAlertWidget
-              key="alerts"
-              className="mx1 hide sm-show"
-              canManageSubscriptions={canManageSubscriptions}
-              question={question}
-              questionAlerts={questionAlerts}
-              onCreateAlert={() =>
-                question.isSaved()
-                  ? onOpenModal("create-alert")
-                  : onOpenModal("save-question-before-alert")
-              }
-            />
-          ),
+          allowAlerts &&
+            QuestionAlertWidget.shouldRender({
+              question,
+              visualizationSettings,
+            }) && (
+              <QuestionAlertWidget
+                key="alerts"
+                className="mx1 hide sm-show"
+                canManageSubscriptions={canManageSubscriptions}
+                question={question}
+                questionAlerts={questionAlerts}
+                onCreateAlert={() =>
+                  question.isSaved()
+                    ? onOpenModal("create-alert")
+                    : onOpenModal("save-question-before-alert")
+                }
+              />
+            ),
           QuestionEmbedWidget.shouldRender({ question, isAdmin }) && (
             <QuestionEmbedWidgetTrigger
               key="embeds"
