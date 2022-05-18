@@ -478,3 +478,57 @@
                     (not (db/exists? 'Database :is_sample false, :initial_sync_status "complete"))
                     ;; frontend should set this value to `true` after the modal has been shown once
                     v))))
+
+(defsetting embedding-dashboard-allow-editing
+  (deferred-tru "Whether to allow editing of the dashboard when embedded")
+  :visibility :public
+  :type       :boolean
+  :default    true)
+
+(defsetting embedding-dashboard-allow-duplication
+  (deferred-tru "Whether to allow duplication of the dashboard when embedded")
+  :visibility :public
+  :type       :boolean
+  :default    true)
+
+(defsetting embedding-dashboard-allow-sharing
+  (deferred-tru "Whether to allow sharing of the dashboard when embedded")
+  :visibility :public
+  :type       :boolean
+  :default    true)
+
+(defsetting embedding-dashboard-show-badge
+  (deferred-tru "Whether to show the folder badge on the dashboard when embedded")
+  :visibility :public
+  :type       :boolean
+  :default    true)
+
+(defsetting embedding-dashboard-show-last-edit-info
+  (deferred-tru "Whether to show the last edit information on the dashboard when embedded")
+  :visibility :public
+  :type       :boolean
+  :default    true)
+
+(defsetting embedding-dashboard-show-revision-history
+  (deferred-tru "Whether to show the revision history on the dashboard when embedded")
+  :visibility :public
+  :type       :boolean
+  :default    true)
+
+(defsetting embedding-view-allow-save
+  (deferred-tru "Whether to show the ''Save'' button when drilled down using full embedding")
+  :visibility :public
+  :type       :boolean
+  :default    true)
+
+(defsetting embedding-view-allow-editing
+  (deferred-tru "Whether to show the ''Show/Hide'' editor button when drilled down using full embedding")
+  :visibility :public
+  :type       :boolean
+  :default    true)
+
+(defsetting embedding-view-allow-alerts
+  (deferred-tru "Whether to show the ''Get alerts'' button when drilled down using full embedding")
+  :visibility :public
+  :type       :boolean
+  :default    true)

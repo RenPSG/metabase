@@ -16,6 +16,7 @@ import { DashboardHeaderButton } from "metabase/dashboard/containers/DashboardHe
 export const getDashboardActions = (
   self,
   {
+    allowSharing,
     dashboard,
     isAdmin,
     canManageSubscriptions,
@@ -45,7 +46,7 @@ export const getDashboardActions = (
     hasCards &&
     dashboard.ordered_cards.some(dashCard => dashCard.card.display !== "text");
 
-  const canShareDashboard = hasCards;
+  const canShareDashboard = allowSharing && hasCards;
   const canCreateSubscription = hasDataCards && canManageSubscriptions;
 
   if (!isEditing && !isEmpty && !isPublic) {
