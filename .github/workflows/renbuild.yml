@@ -67,6 +67,8 @@ jobs:
         image: registry:2
         ports:
           - 5000:5000
+    env:
+      REN_ACR_SERVER: rennonprodk8simagerepo.azurecr.io
     steps:
     - name: Extract and clean branch name
       shell: bash
@@ -112,8 +114,8 @@ jobs:
     - name: Login to ACR
       uses: azure/docker-login@v1
       with:
-        login-server: rennonprodk8simagerepo.azurecr.io
+        login-server: ${{ env.REN_ACR_SERVER }}
         username: ${{ secrets.AZURE_NONPROD_IMAGE_REPO_ACCESS_ID }}
         password: ${{ secrets.AZURE_NONPROD_IMAGE_REPO_ACCESS_SECRET }}
     - name: Retag and push images if Ren release branch
-      run: docker tag localhost:5000/metabase-dev:${{ steps.extract_branch.outputs.branch }}-ee metabase:${{ steps.extract_semver.outputs.semver }}.${{ github.run_number }} && docker push metabase:${{ steps.extract_semver.outputs.semver }}.${{ github.run_number }}
+      run: docker tag localhost:5000/metabase-dev:${{ steps.extract_branch.outputs.branch }}-ee ${{ env.REN_ACR_SERVER }}/metabase:${{ steps.extract_semver.outputs.semver }}.${{ github.run_number }} && docker push ${{ env.REN_ACR_SERVER }}/metabase:${{ steps.extract_semver.outputs.semver }}.${{ github.run_number }}
