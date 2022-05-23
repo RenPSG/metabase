@@ -68,7 +68,7 @@ jobs:
         ports:
           - 5000:5000
     env:
-      REN_ACR_SERVER: rennonprodk8simagerepo.azurecr.io
+      REN_DOCKER_SERVER: 442476910656.dkr.ecr.us-west-2.amazonaws.com
     steps:
     - name: Extract and clean branch name
       shell: bash
@@ -111,11 +111,14 @@ jobs:
     - name: Wait for Metabase to start and reach 100% health
       run: while ! curl -s 'http://localhost:3000/api/health' | grep '{"status":"ok"}'; do sleep 1; done
       timeout-minutes: 1
-    - name: Login to ACR
-      uses: azure/docker-login@v1
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v1
       with:
-        login-server: ${{ env.REN_ACR_SERVER }}
-        username: ${{ secrets.AZURE_NONPROD_IMAGE_REPO_ACCESS_ID }}
-        password: ${{ secrets.AZURE_NONPROD_IMAGE_REPO_ACCESS_SECRET }}
+        aws-access-key-id: ${{ secrets.PINKALOO_DEV_ACCOUNT_ACCESS_KEY_ID }}
+        aws-secred-access-key: ${{ secrets.PINKALOO_DEV_ACCOUNT_SECRET_ACCESS_KEY }}
+        aws-region: us-west-2
+    - name: Login to ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
     - name: Retag and push images if Ren release branch
-      run: docker tag localhost:5000/metabase-dev:${{ steps.extract_branch.outputs.branch }}-ee ${{ env.REN_ACR_SERVER }}/metabase:${{ steps.extract_semver.outputs.semver }}.${{ github.run_number }} && docker push ${{ env.REN_ACR_SERVER }}/metabase:${{ steps.extract_semver.outputs.semver }}.${{ github.run_number }}
+      run: docker tag localhost:5000/metabase-dev:${{ steps.extract_branch.outputs.branch }}-ee ${{ env.REN_DOCKER_SERVER }}/metabase:${{ steps.extract_semver.outputs.semver }}.${{ github.run_number }} && docker push ${{ env.REN_DOCKER_SERVER }}/metabase:${{ steps.extract_semver.outputs.semver }}.${{ github.run_number }}
