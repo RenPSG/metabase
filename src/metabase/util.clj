@@ -15,6 +15,7 @@
             [metabase.config :as config]
             [metabase.shared.util :as shared.u]
             [metabase.util.i18n :refer [trs tru]]
+            [nano-id.core :refer [nano-id]]
             [potemkin :as p]
             [ring.util.codec :as codec]
             [weavejester.dependency :as dep])
@@ -625,7 +626,7 @@
     (long (math/floor (/ (Math/log (math/abs x))
                          (Math/log 10))))))
 
-(defn update-when
+(defn update-if-exists
   "Like `clojure.core/update` but does not create a new key if it does not exist. Useful when you don't want to create
   cruft."
   [m k f & args]
@@ -633,7 +634,7 @@
     (apply update m k f args)
     m))
 
-(defn update-in-when
+(defn update-in-if-exists
   "Like `clojure.core/update-in` but does not create new keys if they do not exist. Useful when you don't want to create
   cruft."
   [m ks f & args]
@@ -956,3 +957,8 @@
   [email-address domain]
   {:pre [(email? email-address)]}
   (= (email->domain email-address) domain))
+
+(defn generate-nano-id
+  "Generates a random NanoID string. Usually these are used for the entity_id field of various models."
+  []
+  (nano-id))
