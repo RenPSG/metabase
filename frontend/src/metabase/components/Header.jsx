@@ -39,6 +39,7 @@ const propTypes = {
   onHeaderModalDone: PropTypes.func,
   onHeaderModalCancel: PropTypes.func,
   onLastEditInfoClick: PropTypes.func,
+  showLastEditInfo: PropTypes.bool,
 };
 
 const defaultProps = {
@@ -117,8 +118,13 @@ class Header extends Component {
   }
 
   render() {
-    const { item, hasBadge, onLastEditInfoClick } = this.props;
-    const hasLastEditInfo = !!item["last-edit-info"];
+    const {
+      item,
+      hasBadge,
+      onLastEditInfoClick,
+      showLastEditInfo,
+    } = this.props;
+    const hasLastEditInfo = showLastEditInfo && !!item["last-edit-info"];
 
     let titleAndDescription;
     if (this.props.item && this.props.item.id != null) {
