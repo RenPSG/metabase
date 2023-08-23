@@ -74,7 +74,7 @@ jobs:
     steps:
     - name: Extract and clean branch name
       shell: bash
-      run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/} | sed 's/[^-._a-zA-Z0-9]/-/g')"
+      run: echo "branch=$(echo ${GITHUB_REF#refs/heads/} | sed 's/[^-._a-zA-Z0-9]/-/g')" >> $GITHUB_OUTPUT
       id: extract_branch
     - name: Check out the code (Dockerfile needed)
       uses: actions/checkout@v3
@@ -82,7 +82,7 @@ jobs:
         fetch-depth: 0
     - name: Extract Metabase SEMVER
       shell: bash
-      run: echo "##[set-output name=semver;]$(git describe --abbrev=0 --tags | cut -c 2-)"
+      run: echo "semver=$(git describe --abbrev=0 --tags | cut -c 2-)" >> $GITHUB_OUTPUT
       id: extract_semver
     - name: Download uploaded artifacts to insert into container
       uses: actions/download-artifact@v2
