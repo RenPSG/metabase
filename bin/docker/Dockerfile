@@ -1,9 +1,5 @@
 FROM eclipse-temurin:11-jre-alpine
 
-ARG USERNAME=renmetabase
-ARG USER_UID=1000
-ARG USER_GID=$USER_UID
-
 ENV FC_LANG en-US LC_CTYPE en_US.UTF-8
 
 # dependencies
@@ -16,10 +12,7 @@ RUN apk add -U bash ttf-dejavu fontconfig curl java-cacerts && \
     curl https://cacerts.digicert.com/DigiCertGlobalRootG2.crt.pem -o /app/certs/DigiCertGlobalRootG2.crt.pem  && \
     /opt/java/openjdk/bin/keytool -noprompt -import -trustcacerts -alias azure-cert -file /app/certs/DigiCertGlobalRootG2.crt.pem -keystore /etc/ssl/certs/java/cacerts -keypass changeit -storepass changeit && \
     mkdir -p /plugins && chmod a+rwx /plugins && \
-    apk del curl wget && \
-    groupmod --gid $USER_GID $USERNAME && \
-    usermod --uid $USER_UID --gid $USER_GID $USERNAME && \
-    chown -R $USER_UID:$USER_GID /home/$USERNAME
+    apk del curl wget &&
 
 USER $USERNAME
 
