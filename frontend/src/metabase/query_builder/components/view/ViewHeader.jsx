@@ -44,6 +44,7 @@ import {
   StyledCollectionBadge,
   StyledQuestionDataSource,
 } from "./ViewHeader.styled";
+import { IFRAMED } from "metabase/lib/dom";
 
 const viewTitleHeaderPropTypes = {
   question: PropTypes.object.isRequired,
@@ -115,11 +116,7 @@ export function ViewTitleHeader(props) {
   const isDataset = question.isDataset();
 
   const isSummarized =
-    isStructured &&
-    question
-      .query()
-      .topLevelQuery()
-      .hasAggregations();
+    isStructured && question.query().topLevelQuery().hasAggregations();
 
   return (
     <>
@@ -236,13 +233,8 @@ AhHocQuestionLeftSide.propTypes = {
 };
 
 function AhHocQuestionLeftSide(props) {
-  const {
-    question,
-    originalQuestion,
-    isNative,
-    isObjectDetail,
-    isSummarized,
-  } = props;
+  const { question, originalQuestion, isNative, isObjectDetail, isSummarized } =
+    props;
   return (
     <div>
       <ViewHeaderMainLeftContentContainer>
@@ -410,9 +402,14 @@ function ViewTitleHeaderRightSide(props) {
     isSaved &&
     canRunAdhocQueries &&
     MetabaseSettings.get("enable-nested-queries");
+  const allowSave =
+    !IFRAMED || MetabaseSettings.get("embedding-view-allow-save");
+  const allowEditing =
+    !IFRAMED || MetabaseSettings.get("embedding-view-allow-editing");
 
   const isNewQuery = !query.hasData();
-  const hasSaveButton = !isDataset && !!isDirty && (isNewQuery || canEditQuery);
+  const hasSaveButton =
+    allowSave && !isDataset && !!isDirty && (isNewQuery || canEditQuery);
   const isMissingPermissions =
     result?.error_type === SERVER_ERROR_TYPES.missingPermissions;
   const hasRunButton =
@@ -470,7 +467,7 @@ function ViewTitleHeaderRightSide(props) {
           data-metabase-event={`View Mode; Open Summary Widget`}
         />
       )}
-      {QuestionNotebookButton.shouldRender({ question }) && (
+      {allowEditing && QuestionNotebookButton.shouldRender({ question }) && (
         <QuestionNotebookButton
           className="hide sm-show"
           ml={2}

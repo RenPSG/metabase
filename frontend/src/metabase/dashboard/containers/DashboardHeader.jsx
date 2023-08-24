@@ -26,16 +26,33 @@ import cx from "classnames";
 
 import { Link } from "react-router";
 
+import MetabaseSettings from "metabase/lib/settings";
+import { IFRAMED } from "metabase/lib/dom";
+
 const mapStateToProps = (state, props) => {
   return {
     isBookmarked: getIsBookmarked(state, props),
     isNavBarOpen: getIsNavbarOpen(state),
+    allowEditing:
+      !IFRAMED || MetabaseSettings.get("embedding-dashboard-allow-editing"),
+    allowDupulication:
+      !IFRAMED || MetabaseSettings.get("embedding-dashboard-allow-duplication"),
+    allowSharing:
+      !IFRAMED || MetabaseSettings.get("embedding-dashboard-allow-sharing"),
+    showBadge:
+      !IFRAMED || MetabaseSettings.get("embedding-dashboard-show-badge"),
+    showLastEditInfo:
+      !IFRAMED ||
+      MetabaseSettings.get("embedding-dashboard-show-last-edit-info"),
+    showRevisionHistory:
+      !IFRAMED ||
+      MetabaseSettings.get("embedding-dashboard-show-revision-history"),
   };
 };
 
 const mapDispatchToProps = {
-  createBookmark: id => Bookmark.actions.create({ id, type: "dashboard" }),
-  deleteBookmark: id => Bookmark.actions.delete({ id, type: "dashboard" }),
+  createBookmark: (id) => Bookmark.actions.create({ id, type: "dashboard" }),
+  deleteBookmark: (id) => Bookmark.actions.delete({ id, type: "dashboard" }),
   onChangeLocation: push,
 };
 
@@ -128,7 +145,7 @@ export default class DashboardHeader extends Component {
         this.props.isEditing &&
         this.props.dashboardBeforeEditing &&
         Object.keys(this.props.dashboardBeforeEditing.embedding_params).some(
-          slug => !currentSlugs.includes(slug),
+          (slug) => !currentSlugs.includes(slug),
         )
       ) {
         return t`You've updated embedded params and will need to update your embed code.`;
@@ -160,6 +177,8 @@ export default class DashboardHeader extends Component {
 
   getHeaderButtons() {
     const {
+      allowEditing,
+      allowDuplication,
       dashboard,
       parametersWidget,
       isBookmarked,
@@ -169,8 +188,10 @@ export default class DashboardHeader extends Component {
       location,
       onToggleAddQuestionSidebar,
       showAddQuestionSidebar,
+      showRevisionHistory,
     } = this.props;
-    const canEdit = dashboard.can_write && isEditable && !!dashboard;
+    const canEdit =
+      allowEditing && dashboard.can_write && isEditable && !!dashboard;
 
     const buttons = [];
     const extraButtons = [];
@@ -306,25 +327,29 @@ export default class DashboardHeader extends Component {
         </div>,
       );
 
-      extraButtons.push(
-        <Link
-          className={extraButtonClassNames}
-          to={location.pathname + "/history"}
-          data-metabase-event={"Dashboard;EditDetails"}
-        >
-          {t`Revision history`}
-        </Link>,
-      );
+      if (showRevisionHistory) {
+        extraButtons.push(
+          <Link
+            className={extraButtonClassNames}
+            to={location.pathname + "/history"}
+            data-metabase-event={"Dashboard;EditDetails"}
+          >
+            {t`Revision history`}
+          </Link>,
+        );
+      }
 
-      extraButtons.push(
-        <Link
-          className={extraButtonClassNames}
-          to={location.pathname + "/copy"}
-          data-metabase-event={"Dashboard;Copy"}
-        >
-          {t`Duplicate`}
-        </Link>,
-      );
+      if (allowDuplication) {
+        extraButtons.push(
+          <Link
+            className={extraButtonClassNames}
+            to={location.pathname + "/copy"}
+            data-metabase-event={"Dashboard;Copy"}
+          >
+            {t`Duplicate`}
+          </Link>,
+        );
+      }
 
       if (canEdit) {
         extraButtons.push(
@@ -336,9 +361,7 @@ export default class DashboardHeader extends Component {
             {t`Move`}
           </Link>,
         );
-      }
 
-      if (canEdit) {
         extraButtons.push(
           <Link
             className={extraButtonClassNames}
@@ -388,7 +411,11 @@ export default class DashboardHeader extends Component {
         item={dashboard}
         isEditing={this.props.isEditing}
         isNavBarOpen={this.props.isNavBarOpen}
-        hasBadge={!this.props.isEditing && !this.props.isFullscreen}
+        hasBadge={
+          this.props.showBadge &&
+          !this.props.isEditing &&
+          !this.props.isFullscreen
+        }
         isEditingInfo={this.props.isEditing}
         headerButtons={this.getHeaderButtons()}
         editWarning={this.getEditWarning(dashboard)}
@@ -398,6 +425,7 @@ export default class DashboardHeader extends Component {
         onLastEditInfoClick={() =>
           onChangeLocation(`${location.pathname}/history`)
         }
+        showLastEditInfo={this.props.showLastEditInfo}
       />
     );
   }

@@ -16,6 +16,7 @@ import { DashboardHeaderButton } from "metabase/dashboard/containers/DashboardHe
 export const getDashboardActions = (
   self,
   {
+    allowSharing,
     dashboard,
     isAdmin,
     canManageSubscriptions,
@@ -43,9 +44,11 @@ export const getDashboardActions = (
   // dashcardData only contains question cards, text ones don't appear here
   const hasDataCards =
     hasCards &&
-    dashboard.ordered_cards.some(dashCard => dashCard.card.display !== "text");
+    dashboard.ordered_cards.some(
+      (dashCard) => dashCard.card.display !== "text",
+    );
 
-  const canShareDashboard = hasCards;
+  const canShareDashboard = allowSharing && hasCards;
   const canCreateSubscription = hasDataCards && canManageSubscriptions;
 
   if (!isEditing && !isEmpty && !isPublic) {
@@ -147,7 +150,7 @@ export const getDashboardActions = (
           data-metabase-event={"Dashboard;Fullscreen Mode;" + !isFullscreen}
         >
           <DashboardHeaderButton
-            onClick={e => onFullscreenChange(!isFullscreen, !e.altKey)}
+            onClick={(e) => onFullscreenChange(!isFullscreen, !e.altKey)}
           >
             <FullscreenIcon
               className="text-brand-hover"

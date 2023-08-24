@@ -37,6 +37,9 @@ import {
   getIconForVisualizationType,
 } from "metabase/visualizations";
 
+import MetabaseSettings from "metabase/lib/settings";
+import { IFRAMED } from "metabase/lib/dom";
+
 const ViewFooter = ({
   question,
   result,
@@ -77,6 +80,11 @@ const ViewFooter = ({
   const hasDataPermission = question.query().isEditable();
   const hideChartSettings = result.error && !hasDataPermission;
 
+  const allowAlerts =
+    !IFRAMED || MetabaseSettings.get("embedding-view-allow-alerts");
+  const allowEditing =
+    !IFRAMED || MetabaseSettings.get("embedding-view-allow-editing");
+
   return (
     <ViewFooterRoot
       className={cx(className, "text-medium border-top")}
@@ -111,7 +119,7 @@ const ViewFooter = ({
               onCloseSummary={onCloseSummary}
             />
           ),
-          !hideChartSettings && (
+          !hideChartSettings && allowEditing && (
             <VizTypeButton
               key="viz-type"
               question={question}
@@ -122,7 +130,7 @@ const ViewFooter = ({
               }
             />
           ),
-          !hideChartSettings && (
+          !hideChartSettings && allowEditing && (
             <VizSettingsButton
               key="viz-settings"
               ml={1}
@@ -143,7 +151,7 @@ const ViewFooter = ({
               className="mx1"
               question={question}
               isShowingRawTable={isShowingRawTable}
-              onShowTable={isShowingRawTable => {
+              onShowTable={(isShowingRawTable) => {
                 setUIControls({ isShowingRawTable });
               }}
             />
@@ -180,23 +188,24 @@ const ViewFooter = ({
               visualizationSettings={visualizationSettings}
             />
           ),
-          QuestionAlertWidget.shouldRender({
-            question,
-            visualizationSettings,
-          }) && (
-            <QuestionAlertWidget
-              key="alerts"
-              className="mx1 hide sm-show"
-              canManageSubscriptions={canManageSubscriptions}
-              question={question}
-              questionAlerts={questionAlerts}
-              onCreateAlert={() =>
-                question.isSaved()
-                  ? onOpenModal("create-alert")
-                  : onOpenModal("save-question-before-alert")
-              }
-            />
-          ),
+          allowAlerts &&
+            QuestionAlertWidget.shouldRender({
+              question,
+              visualizationSettings,
+            }) && (
+              <QuestionAlertWidget
+                key="alerts"
+                className="mx1 hide sm-show"
+                canManageSubscriptions={canManageSubscriptions}
+                question={question}
+                questionAlerts={questionAlerts}
+                onCreateAlert={() =>
+                  question.isSaved()
+                    ? onOpenModal("create-alert")
+                    : onOpenModal("save-question-before-alert")
+                }
+              />
+            ),
           QuestionEmbedWidget.shouldRender({ question, isAdmin }) && (
             <QuestionEmbedWidgetTrigger
               key="embeds"
@@ -272,8 +281,9 @@ const ToggleIcon = styled.div`
   display: flex;
   padding: 4px 8px;
   cursor: pointer;
-  background-color: ${props => (props.active ? color("brand") : "transparent")};
-  color: ${props => (props.active ? "white" : "inherit")};
+  background-color: ${(props) =>
+    props.active ? color("brand") : "transparent"};
+  color: ${(props) => (props.active ? "white" : "inherit")};
   border-radius: 99px;
 `;
 
