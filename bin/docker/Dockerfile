@@ -14,8 +14,6 @@ RUN apk add -U bash ttf-dejavu fontconfig curl java-cacerts && \
     mkdir -p /plugins && chmod a+rwx /plugins && \
     apk del curl
 
-USER $USERNAME
-
 # add Metabase jar & add our run script to the image
 COPY ./metabase.jar ./run_metabase.sh /app/
 
