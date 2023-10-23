@@ -1,4 +1,4 @@
-name: Release [WIP]
+name: Ren Metabase Build
 
 on:
   push:
