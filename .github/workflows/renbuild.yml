@@ -1,9 +1,9 @@
-name: Ren Metabase Build
+name: Ren Build + Docker Uberjar
 
 on:
   push:
     branches:
-    - 'ren-**'
+      - 'ren-**'
 
 jobs:
   build:
