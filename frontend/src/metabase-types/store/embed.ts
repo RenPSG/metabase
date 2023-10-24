@@ -9,6 +9,7 @@ export interface EmbedOptions {
   header?: boolean;
   additional_info?: boolean;
   action_buttons?: boolean;
+  premium_offering?: boolean;
 }
 
 export interface EmbedState {

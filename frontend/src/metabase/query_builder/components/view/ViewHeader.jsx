@@ -383,6 +383,7 @@ ViewTitleHeaderRightSide.propTypes = {
   isShowingQuestionInfoSidebar: PropTypes.bool,
   onModelPersistenceChange: PropTypes.func,
   onQueryChange: PropTypes.func,
+  isPremiumOffering: PropTypes.bool,
 };
 
 function ViewTitleHeaderRightSide(props) {
@@ -417,6 +418,7 @@ function ViewTitleHeaderRightSide(props) {
     onOpenQuestionInfo,
     onModelPersistenceChange,
     onQueryChange,
+    isPremiumOffering,
   } = props;
   const isShowingNotebook = queryBuilderMode === "notebook";
   const query = question.query();
@@ -436,7 +438,8 @@ function ViewTitleHeaderRightSide(props) {
     !isDataset &&
     !!isDirty &&
     (isNewQuery || canEditQuery) &&
-    isActionListVisible;
+    isActionListVisible &&
+    isPremiumOffering;
   const isMissingPermissions =
     result?.error_type === SERVER_ERROR_TYPES.missingPermissions;
   const hasRunButton =

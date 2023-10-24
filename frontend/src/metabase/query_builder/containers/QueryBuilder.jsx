@@ -88,6 +88,7 @@ import {
   getCardAutocompleteResultsFn,
   isResultsMetadataDirty,
   getShouldShowUnsavedChangesWarning,
+  getIsPremiumOffering,
 } from "../selectors";
 import * as actions from "../actions";
 import { VISUALIZATION_SLOW_TIMEOUT } from "../constants";
@@ -150,6 +151,7 @@ const mapStateToProps = (state, props) => {
     isHeaderVisible: getIsHeaderVisible(state),
     isActionListVisible: getIsActionListVisible(state),
     isAdditionalInfoVisible: getIsAdditionalInfoVisible(state),
+    isPremiumOffering: getIsPremiumOffering(state),
 
     parameters: getParameters(state),
     databaseFields: getDatabaseFields(state),

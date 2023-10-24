@@ -14,6 +14,7 @@ export const DEFAULT_EMBED_OPTIONS = {
   header: true,
   additional_info: true,
   action_buttons: true,
+  premium_offering: false,
 } as const;
 
 export const SET_OPTIONS = "metabase/embed/SET_OPTIONS";
