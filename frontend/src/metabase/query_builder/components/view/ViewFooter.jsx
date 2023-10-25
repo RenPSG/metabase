@@ -42,6 +42,7 @@ const ViewFooter = ({
   isShowingTimelineSidebar,
   onOpenTimelines,
   onCloseTimelines,
+  isPremiumOffering,
 }) => {
   if (!result) {
     return null;
@@ -58,7 +59,7 @@ const ViewFooter = ({
       <ButtonBar
         className="flex-full"
         left={[
-          !hideChartSettings && (
+          !hideChartSettings && isPremiumOffering && (
             <FooterButtonGroup>
               <ViewButton
                 medium
