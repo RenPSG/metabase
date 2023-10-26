@@ -145,6 +145,7 @@ class DashboardHeader extends Component {
     hideAddParameterPopover: PropTypes.func,
     addParameter: PropTypes.func,
     isHomepageDashboard: PropTypes.bool,
+    isPremiumOffering: PropTypes.bool,
   };
 
   handleEdit(dashboard) {
@@ -267,6 +268,7 @@ class DashboardHeader extends Component {
       isShowingDashboardInfoSidebar,
       closeSidebar,
       databases,
+      isPremiumOffering,
     } = this.props;
 
     const canEdit = dashboard.can_write;
@@ -410,13 +412,15 @@ class DashboardHeader extends Component {
         action: e => onFullscreenChange(!isFullscreen, !e.altKey),
         event: `Dashboard;Fullscreen Mode;${!isFullscreen}`,
       });
-
-      extraButtons.push({
-        title: t`Duplicate`,
-        icon: "clone",
-        link: `${location.pathname}/copy`,
-        event: "Dashboard;Copy",
-      });
+      
+      if (isPremiumOffering) {
+        extraButtons.push({
+          title: t`Duplicate`,
+          icon: "clone",
+          link: `${location.pathname}/copy`,
+          event: "Dashboard;Copy",
+        });
+      }
 
       extraButtons.push({
         title:

@@ -62,6 +62,7 @@ import {
   getIsAutoApplyFilters,
   getSelectedTabId,
   getIsNavigatingBackToDashboard,
+  getIsPremiumOffering,
 } from "../../selectors";
 import { DASHBOARD_SLOW_TIMEOUT } from "../../constants";
 
@@ -107,6 +108,7 @@ const mapStateToProps = state => {
     selectedTabId: getSelectedTabId(state),
     isAutoApplyFilters: getIsAutoApplyFilters(state),
     isNavigatingBackToDashboard: getIsNavigatingBackToDashboard(state),
+    isPremiumOffering: getIsPremiumOffering(state),
   };
 };
 
@@ -232,6 +234,7 @@ DashboardApp.propTypes = {
   related: PropTypes.arrayOf(PropTypes.object),
   hasSidebar: PropTypes.bool,
   children: PropTypes.node,
+  isPremiumOffering: PropTypes.bool,
 };
 
 export default _.compose(

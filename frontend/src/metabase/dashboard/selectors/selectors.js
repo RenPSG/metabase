@@ -305,3 +305,8 @@ export const getIsAdditionalInfoVisible = createSelector(
   [getIsEmbedded, getEmbedOptions],
   (isEmbedded, embedOptions) => !isEmbedded || embedOptions.additional_info,
 );
+
+export const getIsPremiumOffering = createSelector(
+  [getIsEmbedded, getEmbedOptions],
+  (isEmbedded, embedOptions) => !isEmbedded || embedOptions.premium_offering,
+);
