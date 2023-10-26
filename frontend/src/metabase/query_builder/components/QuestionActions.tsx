@@ -54,6 +54,7 @@ interface Props {
   turnDatasetIntoQuestion: () => void;
   onInfoClick: () => void;
   onModelPersistenceChange: () => void;
+  isPremiumOffering: boolean;
 }
 
 const QuestionActions = ({
@@ -66,6 +67,7 @@ const QuestionActions = ({
   turnDatasetIntoQuestion,
   onInfoClick,
   onModelPersistenceChange,
+  isPremiumOffering,
 }: Props) => {
   const isMetabotEnabled = useSelector(state =>
     getSetting(state, "is-metabot-enabled"),
@@ -164,7 +166,7 @@ const QuestionActions = ({
     });
   }
 
-  if (!isDataset) {
+  if (!isDataset && isPremiumOffering) {
     extraButtons.push({
       title: t`Add to dashboard`,
       icon: "add_to_dash",
@@ -197,7 +199,7 @@ const QuestionActions = ({
     }
   }
 
-  if (!question.query().readOnly()) {
+  if (!question.query().readOnly() && isPremiumOffering) {
     extraButtons.push({
       title: t`Duplicate`,
       icon: "clone",
@@ -242,7 +244,7 @@ const QuestionActions = ({
           triggerAriaLabel={t`Move, archive, and more...`}
           items={extraButtons}
           triggerIcon="ellipsis"
-          tooltip={t`Move, archive, and more...`}
+          tooltip={t`More options...`}
         />
       )}
     </>

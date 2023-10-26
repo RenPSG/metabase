@@ -484,7 +484,7 @@ class DashboardHeader extends Component {
             triggerAriaLabel="dashboard-menu-button"
             items={extraButtons}
             triggerIcon="ellipsis"
-            tooltip={t`Move, archive, and more...`}
+            tooltip={t`More options...`}
           />,
         ].filter(Boolean),
       );
