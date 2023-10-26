@@ -165,6 +165,13 @@ const QuestionActions = ({
       testId: TOGGLE_MODEL_PERSISTENCE_TESTID,
     });
   }
+  
+  if (isPremiumOffering !== undefined) {
+    console.log('QuestionActions isPremiumOffering prop was passed');
+    console.log(isPremiumOffering);
+  } else {
+    console.log('QuestionActions isPremiumOffering prop was NOT!!! passed');
+  }
 
   if (!isDataset && isPremiumOffering) {
     extraButtons.push({

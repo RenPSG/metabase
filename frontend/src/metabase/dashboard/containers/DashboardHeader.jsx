@@ -412,7 +412,14 @@ class DashboardHeader extends Component {
         action: e => onFullscreenChange(!isFullscreen, !e.altKey),
         event: `Dashboard;Fullscreen Mode;${!isFullscreen}`,
       });
-      
+
+      if (isPremiumOffering !== undefined) {
+        console.log('DashboardHeader isPremiumOffering prop was passed');
+        console.log(isPremiumOffering);
+      } else {
+        console.log('DashboardHeader isPremiumOffering prop was NOT!!! passed');
+      }
+
       if (isPremiumOffering) {
         extraButtons.push({
           title: t`Duplicate`,
