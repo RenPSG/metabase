@@ -454,16 +454,20 @@ class DashboardHeader extends Component {
     buttons.push(...getDashboardActions(this, this.props));
 
     if (extraButtons.length > 0 && !isEditing) {
+      buttons.push(<DashboardHeaderActionDivider key="dashboard-button-divider" />);
+      if (isPremiumOffering) {
+        buttons.push(
+            <DashboardBookmark
+              key="dashboard-bookmark-button"
+              dashboard={dashboard}
+              onCreateBookmark={createBookmark}
+              onDeleteBookmark={deleteBookmark}
+              isBookmarked={isBookmarked}
+            />
+        );
+      }
       buttons.push(
         ...[
-          <DashboardHeaderActionDivider key="dashboard-button-divider" />,
-          <DashboardBookmark
-            key="dashboard-bookmark-button"
-            dashboard={dashboard}
-            onCreateBookmark={createBookmark}
-            onDeleteBookmark={deleteBookmark}
-            isBookmarked={isBookmarked}
-          />,
           <Tooltip key="dashboard-info-button" tooltip={t`More info`}>
             <DashboardHeaderButton
               icon="info"
