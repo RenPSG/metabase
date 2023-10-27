@@ -165,13 +165,6 @@ const QuestionActions = ({
       testId: TOGGLE_MODEL_PERSISTENCE_TESTID,
     });
   }
-  
-  if (isPremiumOffering !== undefined) {
-    console.log('QuestionActions isPremiumOffering prop was passed');
-    console.log(isPremiumOffering);
-  } else {
-    console.log('QuestionActions isPremiumOffering prop was NOT!!! passed');
-  }
 
   if (!isDataset && isPremiumOffering) {
     extraButtons.push({
@@ -251,7 +244,7 @@ const QuestionActions = ({
           triggerAriaLabel={t`Move, archive, and more...`}
           items={extraButtons}
           triggerIcon="ellipsis"
-          tooltip={t`More options...`}
+          tooltip={t`Move, archive, and more...`}
         />
       )}
     </>

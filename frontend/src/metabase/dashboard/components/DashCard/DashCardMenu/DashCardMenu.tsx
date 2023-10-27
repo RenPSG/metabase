@@ -30,6 +30,7 @@ interface OwnProps {
   token?: string;
   params?: Record<string, unknown>;
   visualizationSettings?: VisualizationSettings;
+  isPremiumOffering: boolean;
 }
 
 interface TriggerProps {
@@ -59,6 +60,7 @@ const DashCardMenu = ({
   params,
   onEditQuestion,
   onDownloadResults,
+  isPremiumOffering,
 }: DashCardMenuProps) => {
   const [{ loading }, handleDownload] = useAsyncFn(
     async (type: string) => {
@@ -92,7 +94,7 @@ const DashCardMenu = ({
 
   const menuItems = useMemo(
     () => [
-      canEditQuestion(question) && {
+      canEditQuestion(question) && isPremiumOffering &&{
         title: `Edit question`,
         icon: "pencil",
         action: () => onEditQuestion(question),
