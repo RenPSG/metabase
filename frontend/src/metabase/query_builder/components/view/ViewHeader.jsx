@@ -534,6 +534,7 @@ function ViewTitleHeaderRightSide(props) {
           turnDatasetIntoQuestion={turnDatasetIntoQuestion}
           onInfoClick={handleInfoClick}
           onModelPersistenceChange={onModelPersistenceChange}
+          isPremiumOffering={isPremiumOffering}
         />
       )}
       {hasSaveButton && (
