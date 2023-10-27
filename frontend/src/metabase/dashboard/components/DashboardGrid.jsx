@@ -379,6 +379,7 @@ class DashboardGrid extends Component {
         dashboard={this.props.dashboard}
         showClickBehaviorSidebar={this.props.showClickBehaviorSidebar}
         clickBehaviorSidebarDashcard={this.props.clickBehaviorSidebarDashcard}
+        isPremiumOffering={this.props.isPremiumOffering}
       />
     );
   }

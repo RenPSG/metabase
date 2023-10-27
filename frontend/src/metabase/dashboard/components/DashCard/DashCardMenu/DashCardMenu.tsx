@@ -30,7 +30,6 @@ interface OwnProps {
   token?: string;
   params?: Record<string, unknown>;
   visualizationSettings?: VisualizationSettings;
-  isPremiumOffering: boolean;
 }
 
 interface TriggerProps {
@@ -60,7 +59,6 @@ const DashCardMenu = ({
   params,
   onEditQuestion,
   onDownloadResults,
-  isPremiumOffering,
 }: DashCardMenuProps) => {
   const [{ loading }, handleDownload] = useAsyncFn(
     async (type: string) => {
@@ -94,7 +92,7 @@ const DashCardMenu = ({
 
   const menuItems = useMemo(
     () => [
-      canEditQuestion(question) && isPremiumOffering &&{
+      canEditQuestion(question) && {
         title: `Edit question`,
         icon: "pencil",
         action: () => onEditQuestion(question),
@@ -132,6 +130,7 @@ interface QueryDownloadWidgetOpts {
   isEmbed: boolean;
   isPublic?: boolean;
   isEditing: boolean;
+  isPremiumOffering: boolean;
 }
 
 const canEditQuestion = (question: Question) => {
@@ -153,6 +152,7 @@ DashCardMenu.shouldRender = ({
   isEmbed,
   isPublic,
   isEditing,
+  isPremiumOffering,
 }: QueryDownloadWidgetOpts) => {
   const isInternalQuery = question.query() instanceof InternalQuery;
   if (isEmbed) {
@@ -163,6 +163,7 @@ DashCardMenu.shouldRender = ({
     !isPublic &&
     !isEditing &&
     !isXray &&
+    isPremiumOffering &&
     (canEditQuestion(question) || canDownloadResults(result))
   );
 };

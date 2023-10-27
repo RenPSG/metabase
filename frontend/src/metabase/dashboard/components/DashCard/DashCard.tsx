@@ -83,6 +83,7 @@ export interface DashCardProps {
   onUpdateVisualizationSettings: (settings: VisualizationSettings) => void;
   showClickBehaviorSidebar: (dashCardId: DashCardId | null) => void;
   onChangeLocation: (location: LocationDescriptor) => void;
+  isPremiumOffering: boolean;
 }
 
 function DashCard({
@@ -112,6 +113,7 @@ function DashCard({
   onChangeLocation,
   onUpdateVisualizationSettings,
   onReplaceAllVisualizationSettings,
+  isPremiumOffering,
 }: DashCardProps) {
   const [isPreviewingCard, setIsPreviewingCard] = useState(false);
   const cardRootRef = useRef<HTMLDivElement>(null);
@@ -337,6 +339,7 @@ function DashCard({
           onUpdateVisualizationSettings={onUpdateVisualizationSettings}
           onChangeCardAndRun={changeCardAndRunHandler}
           onChangeLocation={onChangeLocation}
+          isPremiumOffering={isPremiumOffering}
         />
       </DashCardRoot>
     </ErrorBoundary>

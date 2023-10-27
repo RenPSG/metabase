@@ -85,6 +85,7 @@ interface DashCardVisualizationProps {
   onChangeCardAndRun: DashCardOnChangeCardAndRunHandler | null;
   showClickBehaviorSidebar: (dashCardId: DashCardId | null) => void;
   onChangeLocation: (location: LocationDescriptor) => void;
+  isPremiumOffering: boolean;
 }
 
 function mapDispatchToProps(dispatch: Dispatch) {
@@ -129,6 +130,7 @@ function DashCardVisualization({
   showClickBehaviorSidebar,
   onChangeLocation,
   onUpdateVisualizationSettings,
+  isPremiumOffering,
 }: DashCardVisualizationProps) {
   const question = useMemo(() => {
     return new Question(dashcard.card, metadata);
@@ -197,6 +199,7 @@ function DashCardVisualization({
       isEmbed,
       isPublic,
       isEditing,
+      isPremiumOffering,
     });
 
     if (!shouldShowDashCardMenu) {
