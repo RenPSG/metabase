@@ -5,14 +5,14 @@ import {
 } from "metabase/lib/redux";
 
 export const DEFAULT_EMBED_OPTIONS = {
-  top_nav: true,
-  side_nav: "default",
+  top_nav: false,
+  side_nav: false,
   search: false,
   new_button: false,
-  breadcrumbs: true,
-  logo: true,
+  breadcrumbs: false,
+  logo: false,
   header: true,
-  additional_info: true,
+  additional_info: false,
   action_buttons: true,
   premium_offering: false,
 } as const;
