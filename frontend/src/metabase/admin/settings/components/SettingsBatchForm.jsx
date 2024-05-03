@@ -1,22 +1,29 @@
 /* eslint-disable react/prop-types */
-import React, { Component } from "react";
+import cx from "classnames";
 import PropTypes from "prop-types";
+import { Component } from "react";
+import * as React from "react";
+import Collapse from "react-collapse";
 import { connect } from "react-redux";
+import { t } from "ttag";
 import _ from "underscore";
 
-import Collapse from "react-collapse";
-import { t } from "ttag";
 import Breadcrumbs from "metabase/components/Breadcrumbs";
-import Button from "metabase/core/components/Button";
 import DisclosureTriangle from "metabase/components/DisclosureTriangle";
-import MetabaseUtils from "metabase/lib/utils";
-import SettingsSetting from "./SettingsSetting";
+import Button from "metabase/core/components/Button";
+import CS from "metabase/css/core/index.css";
+import { isEmail, isEmpty } from "metabase/lib/utils";
 
-import { updateSettings as defaultUpdateSettings } from "../settings";
+import { CollapsibleSectionContent } from "./SettingsBatchForm.styled";
+import { SettingsSetting } from "./SettingsSetting";
 
 const VALIDATIONS = {
   email: {
-    validate: value => MetabaseUtils.isEmail(value),
+    validate: value => isEmail(value),
+    message: t`That's not a valid email address`,
+  },
+  email_list: {
+    validate: value => value.every(isEmail),
     message: t`That's not a valid email address`,
   },
   integer: {
@@ -44,8 +51,13 @@ class SettingsBatchForm extends Component {
   }
 
   static propTypes = {
+    breadcrumbs: PropTypes.array,
     elements: PropTypes.array.isRequired,
-    formErrors: PropTypes.object,
+    layout: PropTypes.array,
+    renderSubmitButton: PropTypes.func,
+    renderExtraButtons: PropTypes.func,
+    ref: PropTypes.forwardRef,
+    settingValues: PropTypes.object,
     updateSettings: PropTypes.func.isRequired,
   };
 
@@ -80,7 +92,7 @@ class SettingsBatchForm extends Component {
 
   // return null if element passes validation, otherwise return an error message
   validateElement(validation, value, element) {
-    if (MetabaseUtils.isEmpty(value)) {
+    if (isEmpty(value)) {
       return;
     }
 
@@ -105,17 +117,18 @@ class SettingsBatchForm extends Component {
 
     let valid = true;
     const validationErrors = {};
+    const availableElements = elements.filter(e => !e.is_env_setting);
 
     // Validate form only if LDAP is enabled
     if (!enabledKey || formData[enabledKey]) {
-      elements.forEach(function(element) {
+      availableElements.forEach(function (element) {
         // test for required elements
-        if (element.required && MetabaseUtils.isEmpty(formData[element.key])) {
+        if (element.required && isEmpty(formData[element.key])) {
           valid = false;
         }
 
         if (element.validations) {
-          element.validations.forEach(function(validation) {
+          element.validations.forEach(function (validation) {
             validationErrors[element.key] = this.validateElement(
               validation,
               formData[element.key],
@@ -182,9 +195,8 @@ class SettingsBatchForm extends Component {
     return formErrors;
   }
 
-  updateSettings = e => {
-    e.preventDefault();
-
+  handleSubmit = () => {
+    const { updateSettings } = this.props;
     const { formData, valid } = this.state;
 
     if (valid) {
@@ -193,7 +205,7 @@ class SettingsBatchForm extends Component {
         submitting: "working",
       });
 
-      this.props.updateSettings(formData).then(
+      return updateSettings(formData).then(
         () => {
           this.setState({ pristine: true, submitting: "success" });
 
@@ -205,13 +217,26 @@ class SettingsBatchForm extends Component {
             submitting: "default",
             formErrors: this.handleFormErrors(error),
           });
+          throw error;
         },
       );
     }
   };
 
+  handleSubmitClick = event => {
+    event.preventDefault();
+    this.handleSubmit();
+  };
+
   render() {
-    const { elements, settingValues } = this.props;
+    const {
+      elements,
+      settingValues,
+      breadcrumbs,
+      renderSubmitButton,
+      renderExtraButtons,
+    } = this.props;
+
     const {
       formData,
       formErrors,
@@ -258,8 +283,8 @@ class SettingsBatchForm extends Component {
     const disabled = !valid || submitting !== "default";
     return (
       <div>
-        {this.props.breadcrumbs && (
-          <Breadcrumbs crumbs={this.props.breadcrumbs} className="ml2 mb3" />
+        {breadcrumbs && (
+          <Breadcrumbs crumbs={breadcrumbs} className={cx(CS.ml2, CS.mb3)} />
         )}
 
         {layout.map((section, index) =>
@@ -275,26 +300,39 @@ class SettingsBatchForm extends Component {
         )}
 
         {formErrors && formErrors.message && (
-          <div className="m2 text-error text-bold">{formErrors.message}</div>
+          <div className={cx(CS.m2, CS.textError, CS.textBold)}>
+            {formErrors.message}
+          </div>
         )}
 
-        <div className="m2 mb4">
-          <Button
-            mr={1}
-            primary={!disabled}
-            success={submitting === "success"}
-            disabled={disabled || pristine}
-            onClick={this.updateSettings}
-          >
-            {SAVE_SETTINGS_BUTTONS_STATES[submitting]}
-          </Button>
-
-          {this.props.renderExtraButtons &&
-            this.props.renderExtraButtons({
+        <div className={cx(CS.m2, CS.mb4)}>
+          {renderSubmitButton ? (
+            renderSubmitButton({
               valid,
               submitting,
               disabled,
               pristine,
+              onSubmit: this.handleSubmit,
+            })
+          ) : (
+            <Button
+              className={CS.mr1}
+              primary={!disabled}
+              success={submitting === "success"}
+              disabled={disabled || pristine}
+              onClick={this.handleSubmitClick}
+            >
+              {SAVE_SETTINGS_BUTTONS_STATES[submitting]}
+            </Button>
+          )}
+
+          {renderExtraButtons &&
+            renderExtraButtons({
+              valid,
+              submitting,
+              disabled,
+              pristine,
+              onSubmit: this.handleSubmit,
             })}
         </div>
       </div>
@@ -304,17 +342,14 @@ class SettingsBatchForm extends Component {
 
 export default connect(
   null,
-  (dispatch, { updateSettings }) => ({
-    updateSettings:
-      updateSettings || (settings => dispatch(defaultUpdateSettings(settings))),
-  }),
   null,
-  { withRef: true }, // HACK: needed so consuming components can call methods on the component :-/
+  null,
+  { forwardRef: true }, // HACK: needed so consuming components can call methods on the component :-/
 )(SettingsBatchForm);
 
 const StandardSection = ({ title, children }) => (
   <div>
-    {title && <h2 className="mx2">{title}</h2>}
+    {title && <h2 className={CS.mx2}>{title}</h2>}
     <ul>{children}</ul>
   </div>
 );
@@ -333,16 +368,13 @@ class CollapsibleSection extends React.Component {
     const { title, children } = this.props;
     const { show } = this.state;
     return (
-      <section className="mb4">
-        <div
-          className="inline-block ml1 cursor-pointer text-brand-hover"
-          onClick={this.handleToggle.bind(this)}
-        >
-          <div className="flex align-center">
-            <DisclosureTriangle className="mx1" open={show} />
+      <section className={CS.mb4}>
+        <CollapsibleSectionContent onClick={this.handleToggle.bind(this)}>
+          <div className={cx(CS.flex, CS.alignCenter)}>
+            <DisclosureTriangle className={CS.mx1} open={show} />
             <h3>{title}</h3>
           </div>
-        </div>
+        </CollapsibleSectionContent>
         <Collapse isOpened={show} keepCollapsedContent>
           <ul>{children}</ul>
         </Collapse>

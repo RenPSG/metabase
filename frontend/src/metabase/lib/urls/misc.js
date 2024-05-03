@@ -1,19 +1,13 @@
-import slugg from "slugg";
-
 import { dashboard } from "./dashboards";
-import { question, dataset, tableRowsQuery } from "./questions";
+import { model } from "./models";
 import { pulse } from "./pulses";
-import { appendSlug } from "./utils";
+import { question, tableRowsQuery } from "./questions";
 
 export const exportFormats = ["csv", "xlsx", "json"];
+export const exportFormatPng = "png";
 
 export function accountSettings() {
   return "/account/profile";
-}
-
-export function bookmark({ id, type, name }) {
-  const [, idInteger] = id.split("-");
-  return `/${type}/${appendSlug(idInteger, slugg(name))}`;
 }
 
 function prepareModel(item) {
@@ -33,7 +27,7 @@ export function modelToUrl(item) {
     case "card":
       return question(modelData);
     case "dataset":
-      return dataset(modelData);
+      return model(modelData);
     case "dashboard":
       return dashboard(modelData);
     case "pulse":

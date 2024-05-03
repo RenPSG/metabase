@@ -1,8 +1,11 @@
-import React, { useCallback, useMemo, useRef } from "react";
-import { debounce } from "lodash";
-import { originalColors } from "../../lib/whitelabel";
-import ColorSettings from "../ColorSettings";
-import { ColorSetting } from "./types";
+import { useCallback, useMemo, useRef } from "react";
+import _ from "underscore";
+
+import { originalColors } from "metabase/lib/colors/palette";
+
+import { ColorSettings } from "../ColorSettings";
+
+import type { ColorSetting } from "./types";
 
 export interface ColorSettingsWidget {
   setting: ColorSetting;
@@ -24,7 +27,7 @@ const ColorSettingsWidget = ({
   );
 };
 
-const useDebounce = function<T>(func: (value: T) => void, wait: number) {
+const useDebounce = function <T>(func: (value: T) => void, wait: number) {
   const ref = useRef(func);
   ref.current = func;
 
@@ -33,8 +36,9 @@ const useDebounce = function<T>(func: (value: T) => void, wait: number) {
   }, []);
 
   return useMemo(() => {
-    return debounce(callback, wait);
+    return _.debounce(callback, wait);
   }, [callback, wait]);
 };
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default ColorSettingsWidget;

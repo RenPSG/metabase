@@ -1,5 +1,4 @@
 import d3 from "d3";
-import Color from "color";
 
 export const getColorScale = (
   extent: [number, number],
@@ -7,10 +6,7 @@ export const getColorScale = (
   isQuantile: boolean = false,
 ) => {
   if (isQuantile) {
-    return d3.scale
-      .quantile<string>()
-      .domain(extent)
-      .range(colors);
+    return d3.scale.quantile<string>().domain(extent).range(colors);
   } else {
     const [start, end] = extent;
     return d3.scale
@@ -24,7 +20,8 @@ export const getColorScale = (
   }
 };
 
-const RGBA_REGEX = /rgba\((\d+\.\d+),\s*(\d+\.\d+),\s*(\d+\.\d+),\s*(\d+\.\d+)\)/;
+const RGBA_REGEX =
+  /rgba\((\d+\.\d+),\s*(\d+\.\d+),\s*(\d+\.\d+),\s*(\d+\.\d+)\)/;
 
 export const getSafeColor = (color: string) => {
   return color.replace(RGBA_REGEX, (_, r, g, b, a) => {

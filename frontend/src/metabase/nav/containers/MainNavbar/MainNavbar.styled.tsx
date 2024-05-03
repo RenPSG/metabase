@@ -1,15 +1,15 @@
-import styled from "@emotion/styled";
 import { css } from "@emotion/react";
-
-import Icon from "metabase/components/Icon";
-import { NAV_SIDEBAR_WIDTH } from "metabase/nav/constants";
+import styled from "@emotion/styled";
 
 import { color, lighten } from "metabase/lib/colors";
+import { NAV_SIDEBAR_WIDTH } from "metabase/nav/constants";
 import {
   breakpointMaxSmall,
   breakpointMinSmall,
   space,
 } from "metabase/styled-components/theme";
+import { Icon } from "metabase/ui";
+
 import { SidebarLink } from "./SidebarItems";
 
 const openSidebarCSS = css`
@@ -22,6 +22,10 @@ const openSidebarCSS = css`
   }
 `;
 
+const closeSidebarCSS = css`
+  opacity: 0;
+`;
+
 export const Sidebar = styled.aside<{ isOpen: boolean }>`
   width: 0;
   height: 100%;
@@ -29,20 +33,13 @@ export const Sidebar = styled.aside<{ isOpen: boolean }>`
   position: relative;
   flex-shrink: 0;
   align-items: center;
-  padding: 0.5rem 0;
   background-color: ${color("white")};
 
   overflow: auto;
   overflow-x: hidden;
   z-index: 4;
 
-  transition: width 0.2s;
-
-  @media (prefers-reduced-motion) {
-    transition: none;
-  }
-
-  ${props => props.isOpen && openSidebarCSS};
+  ${props => (props.isOpen ? openSidebarCSS : closeSidebarCSS)};
 
   ${breakpointMaxSmall} {
     position: absolute;
@@ -61,7 +58,6 @@ export const NavRoot = styled.nav<{ isOpen: boolean }>`
 
   overflow-x: hidden;
   overflow-y: auto;
-  padding-bottom: 4rem;
 
   opacity: ${props => (props.isOpen ? 1 : 0)};
   transition: opacity 0.2s;
@@ -122,42 +118,29 @@ export const CollectionMenuList = styled.ul`
   padding: 0.5rem;
 `;
 
-export const LoadingContainer = styled.div`
+export const LoadingAndErrorContainer = styled.div`
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+`;
+
+export const LoadingAndErrorContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   color: ${color("brand")};
   text-align: center;
 `;
 
-export const LoadingTitle = styled.h2`
+export const LoadingAndErrorTitle = styled.h2`
   color: ${color("text-light")};
   font-weight: 400;
   margin-top: ${space(1)};
 `;
 
-export const ProfileLinkContainer = styled.div<{ isOpen: boolean }>`
-  position: fixed;
-  bottom: 0;
-  // Height is hard-set so it remains
-  // the same as the ArchiveBarContent
-  // in ArchiveApp
-  height: 49px;
-  left: 0;
-  padding: ${space(0)};
-  width: ${props => (props.isOpen ? NAV_SIDEBAR_WIDTH : 0)};
-  border-top: 1px solid ${color("border")};
-  background-color: ${color("white")};
-  display: flex;
-  overflow: hidden;
-  align-items: center;
-  margin-right: ${space(2)};
-  color: ${color("text-light")};
-`;
-
-export const HomePageLink = styled(SidebarLink)`
+export const PaddedSidebarLink = styled(SidebarLink)`
   padding-left: 12px;
-`;
-
-export const BrowseLink = styled(SidebarLink)`
-  padding-left: 14px;
 `;
 
 export const AddYourOwnDataLink = styled(SidebarLink)`
@@ -166,6 +149,9 @@ export const AddYourOwnDataLink = styled(SidebarLink)`
   color: ${color("white")};
   margin: ${space(1)};
   padding: 2px 6px;
+  svg {
+    color: ${color("brand-light")};
+  }
   transition: background-color 0.3s linear;
 
   @media (prefers-reduced-motion) {

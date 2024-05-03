@@ -1,8 +1,9 @@
 (ns column.strict
-  (:require [clojure.spec.alpha :as s]
-            column.common))
+  (:require
+   [clojure.spec.alpha :as s]
+   [column.common]))
 
-(defmulti column-name :name)
+(defmulti ^:private column-name :name)
 
 ;; remark is *required* for non-ID columns
 (defmethod column-name :default

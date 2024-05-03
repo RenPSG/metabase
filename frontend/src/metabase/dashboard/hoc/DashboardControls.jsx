@@ -1,20 +1,21 @@
 /* eslint-disable react/prop-types */
-import React, { Component } from "react";
-
+import { Component } from "react";
 import { connect } from "react-redux";
 import { replace } from "react-router-redux";
+import screenfull from "screenfull";
 
+import HideS from "metabase/css/core/hide.module.css";
 import * as MetabaseAnalytics from "metabase/lib/analytics";
 import { parseHashOptions, stringifyHashOptions } from "metabase/lib/browser";
-
-import screenfull from "screenfull";
 
 const TICK_PERIOD = 1; // seconds
 
 /* This contains some state for dashboard controls on both private and embedded dashboards.
  * It should probably be in Redux?
+ *
+ * @deprecated HOCs are deprecated
  */
-export default ComposedComponent =>
+export const DashboardControls = ComposedComponent =>
   connect(null, { replace })(
     class extends Component {
       static displayName =
@@ -24,7 +25,7 @@ export default ComposedComponent =>
 
       state = {
         isFullscreen: false,
-        isNightMode: false,
+        theme: null,
 
         refreshPeriod: null,
 
@@ -41,8 +42,12 @@ export default ComposedComponent =>
         this.loadDashboardParams();
       }
 
-      componentDidUpdate() {
-        this.updateDashboardParams();
+      componentDidUpdate(prevProps) {
+        if (prevProps.location !== this.props.location) {
+          this.syncUrlHashToState();
+        } else {
+          this.syncStateToUrlHash();
+        }
         this._showNav(!this.state.isFullscreen);
       }
 
@@ -66,12 +71,21 @@ export default ComposedComponent =>
             ? null
             : options.refresh,
         );
-        this.setNightMode(options.theme === "night" || options.night); // DEPRECATED: options.night
+        this.setTheme(options.theme);
         this.setFullscreen(options.fullscreen);
         this.setHideParameters(options.hide_parameters);
       };
 
-      updateDashboardParams = () => {
+      syncUrlHashToState() {
+        const { location } = this.props;
+
+        const { refresh, fullscreen, theme } = parseHashOptions(location.hash);
+        this.setRefreshPeriod(refresh);
+        this.setFullscreen(fullscreen);
+        this.setTheme(theme);
+      }
+
+      syncStateToUrlHash = () => {
         const { location, replace } = this.props;
 
         const options = parseHashOptions(location.hash);
@@ -84,7 +98,7 @@ export default ComposedComponent =>
         };
         setValue("refresh", this.state.refreshPeriod);
         setValue("fullscreen", this.state.isFullscreen);
-        setValue("theme", this.state.isNightMode ? "night" : null);
+        setValue("theme", this.state.theme);
 
         delete options.night; // DEPRECATED: options.night
 
@@ -127,9 +141,14 @@ export default ComposedComponent =>
         }
       };
 
+      // Preserve existing behavior, while keeping state in a new `theme` key
       setNightMode = isNightMode => {
-        isNightMode = !!isNightMode;
-        this.setState({ isNightMode });
+        const theme = isNightMode ? "night" : null;
+        this.setState({ theme });
+      };
+
+      setTheme = theme => {
+        this.setState({ theme });
       };
 
       setFullscreen = async (isFullscreen, browserFullscreen = true) => {
@@ -162,14 +181,15 @@ export default ComposedComponent =>
         const { refreshPeriod } = this.state;
         if (refreshPeriod && this._refreshElapsed >= refreshPeriod) {
           this._refreshElapsed = 0;
-          await this.props.fetchDashboard(
-            this.props.dashboardId,
-            this.props.location.query,
-            true,
-          );
+          await this.props.fetchDashboard({
+            dashId: this.props.dashboardId,
+            queryParams: this.props.location.query,
+            options: { preserveParameters: true },
+          });
           this.props.fetchDashboardCardData({
+            isRefreshing: true,
             reload: true,
-            clear: false,
+            clearCache: false,
           });
         }
         this.setRefreshElapsed(this._refreshElapsed);
@@ -185,11 +205,14 @@ export default ComposedComponent =>
         // NOTE Atte Keinänen 8/10/17: For some reason `document` object isn't present in Jest tests
         // when _showNav is called for the first time
         if (window.document) {
-          const nav = window.document.querySelector(".Nav");
+          const nav = document.body.querySelector(
+            "[data-element-id='navbar-root']",
+          );
+
           if (show && nav) {
-            nav.classList.remove("hide");
+            nav.classList.remove(HideS.hide);
           } else if (!show && nav) {
-            nav.classList.add("hide");
+            nav.classList.add(HideS.hide);
           }
         }
       }
@@ -213,9 +236,10 @@ export default ComposedComponent =>
           <ComposedComponent
             {...this.props}
             {...this.state}
+            isNightMode={this.state.theme === "night"}
+            hasNightModeToggle={this.state.theme !== "transparent"}
             setRefreshElapsedHook={this.setRefreshElapsedHook}
             loadDashboardParams={this.loadDashboardParams}
-            updateDashboardParams={this.updateDashboardParams}
             onNightModeChange={this.setNightMode}
             onFullscreenChange={this.setFullscreen}
             onRefreshPeriodChange={this.setRefreshPeriod}

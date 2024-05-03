@@ -1,34 +1,38 @@
-import React, { ErrorInfo, ReactNode, useState } from "react";
+import type { Location } from "history";
+import { KBarProvider } from "kbar";
+import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { connect } from "react-redux";
-import { Location } from "history";
 
-import AppErrorCard from "metabase/components/AppErrorCard/AppErrorCard";
-
-import ScrollToTop from "metabase/hoc/ScrollToTop";
+import { AppBanner } from "metabase/components/AppBanner";
 import {
   Archived,
   GenericError,
+  KeyboardTriggeredErrorModal,
   NotFound,
   Unauthorized,
-} from "metabase/containers/ErrorPages";
-import UndoListing from "metabase/containers/UndoListing";
-
+} from "metabase/components/ErrorPages";
+import { UndoListing } from "metabase/containers/UndoListing";
+import { ContentViewportContext } from "metabase/core/context/ContentViewportContext";
+import CS from "metabase/css/core/index.css";
+import ScrollToTop from "metabase/hoc/ScrollToTop";
+import { initializeIframeResizer } from "metabase/lib/dom";
+import AppBar from "metabase/nav/containers/AppBar";
+import Navbar from "metabase/nav/containers/Navbar";
+import { setErrorPage } from "metabase/redux/app";
 import {
   getErrorPage,
   getIsAdminApp,
   getIsAppBarVisible,
-  getIsNavBarVisible,
+  getIsNavBarEnabled,
 } from "metabase/selectors/app";
-import { useOnMount } from "metabase/hooks/use-on-mount";
-import { initializeIframeResizer } from "metabase/lib/dom";
+import StatusListing from "metabase/status/components/StatusListing";
+import type { AppErrorDescriptor, State } from "metabase-types/store";
 
-import AppBar from "metabase/nav/containers/AppBar";
-import Navbar from "metabase/nav/containers/Navbar";
-import StatusListing from "metabase/status/containers/StatusListing";
-
-import { AppErrorDescriptor, State } from "metabase-types/store";
-
-import { AppContent, AppContentContainer } from "./App.styled";
+import { AppContainer, AppContent, AppContentContainer } from "./App.styled";
+import ErrorBoundary from "./ErrorBoundary";
+import { NewModals } from "./new/components/NewModals/NewModals";
+import { Palette } from "./palette/components/Palette";
 
 const getErrorComponent = ({ status, data, context }: AppErrorDescriptor) => {
   if (status === 403 || data?.error_code === "unauthorized") {
@@ -49,8 +53,13 @@ const getErrorComponent = ({ status, data, context }: AppErrorDescriptor) => {
 interface AppStateProps {
   errorPage: AppErrorDescriptor | null;
   isAdminApp: boolean;
+  bannerMessageDescriptor?: string;
   isAppBarVisible: boolean;
-  isNavBarVisible: boolean;
+  isNavBarEnabled: boolean;
+}
+
+interface AppDispatchProps {
+  onError: (error: unknown) => void;
 }
 
 interface AppRouterOwnProps {
@@ -58,7 +67,7 @@ interface AppRouterOwnProps {
   children: ReactNode;
 }
 
-type AppProps = AppStateProps & AppRouterOwnProps;
+type AppProps = AppStateProps & AppDispatchProps & AppRouterOwnProps;
 
 const mapStateToProps = (
   state: State,
@@ -67,57 +76,58 @@ const mapStateToProps = (
   errorPage: getErrorPage(state),
   isAdminApp: getIsAdminApp(state, props),
   isAppBarVisible: getIsAppBarVisible(state, props),
-  isNavBarVisible: getIsNavBarVisible(state, props),
+  isNavBarEnabled: getIsNavBarEnabled(state, props),
 });
 
-class ErrorBoundary extends React.Component<{
-  onError: (errorInfo: ErrorInfo) => void;
-}> {
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    this.props.onError(errorInfo);
-  }
-
-  render() {
-    return this.props.children;
-  }
-}
+const mapDispatchToProps: AppDispatchProps = {
+  onError: setErrorPage,
+};
 
 function App({
   errorPage,
   isAdminApp,
   isAppBarVisible,
-  isNavBarVisible,
+  isNavBarEnabled,
   children,
+  onError,
 }: AppProps) {
-  const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null);
+  const [viewportElement, setViewportElement] = useState<HTMLElement | null>();
 
-  useOnMount(() => {
+  useEffect(() => {
     initializeIframeResizer();
-  });
+  }, []);
 
   return (
-    <ErrorBoundary onError={setErrorInfo}>
+    <ErrorBoundary onError={onError}>
       <ScrollToTop>
-        <div className="spread">
-          {isAppBarVisible && <AppBar isNavBarVisible={isNavBarVisible} />}
-          <AppContentContainer
-            isAdminApp={isAdminApp}
-            isAppBarVisible={isAppBarVisible}
-          >
-            {isNavBarVisible && <Navbar />}
-            <AppContent>
-              {errorPage ? getErrorComponent(errorPage) : children}
-            </AppContent>
-            <UndoListing />
-            <StatusListing />
-          </AppContentContainer>
-          <AppErrorCard errorInfo={errorInfo} />
-        </div>
+        <KBarProvider>
+          <KeyboardTriggeredErrorModal />
+          <AppContainer className={CS.spread}>
+            <AppBanner />
+            {isAppBarVisible && <AppBar />}
+            <AppContentContainer isAdminApp={isAdminApp}>
+              {isNavBarEnabled && <Navbar />}
+              <AppContent ref={setViewportElement}>
+                <ContentViewportContext.Provider
+                  value={viewportElement ?? null}
+                >
+                  {errorPage ? getErrorComponent(errorPage) : children}
+                </ContentViewportContext.Provider>
+              </AppContent>
+              <UndoListing />
+              <StatusListing />
+              <NewModals />
+            </AppContentContainer>
+          </AppContainer>
+          <Palette />
+        </KBarProvider>
       </ScrollToTop>
     </ErrorBoundary>
   );
 }
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default connect<AppStateProps, unknown, AppRouterOwnProps, State>(
   mapStateToProps,
+  mapDispatchToProps,
 )(App);

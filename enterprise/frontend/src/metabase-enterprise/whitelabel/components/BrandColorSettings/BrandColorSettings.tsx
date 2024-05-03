@@ -1,11 +1,11 @@
-import React, { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { t } from "ttag";
-import { omit, set } from "lodash";
-import { color } from "metabase/lib/colors";
-import { useCurrentRef } from "metabase/hooks/use-current-ref";
+import _ from "underscore";
+
 import ColorPicker from "metabase/core/components/ColorPicker";
-import { getBrandColorOptions } from "./utils";
-import { ColorOption } from "./types";
+import { useCurrentRef } from "metabase/hooks/use-current-ref";
+import { color } from "metabase/lib/colors";
+
 import {
   TableBody,
   TableBodyCell,
@@ -14,11 +14,13 @@ import {
   TableHeaderCell,
   TableHeaderRow,
 } from "./BrandColorSettings.styled";
+import type { ColorOption } from "./types";
+import { getBrandColorOptions } from "./utils";
 
 export interface BrandColorSettingsProps {
   colors: Record<string, string>;
   colorPalette: Record<string, string>;
-  onChange?: (colors: Record<string, string>) => void;
+  onChange: (colors: Record<string, string>) => void;
 }
 
 const BrandColorSettings = ({
@@ -32,9 +34,9 @@ const BrandColorSettings = ({
   const handleChange = useCallback(
     (colorName: string, color?: string) => {
       if (color) {
-        onChange?.(set({ ...colorsRef.current }, colorName, color));
+        onChange({ ...colorsRef.current, [colorName]: color });
       } else {
-        onChange?.(omit({ ...colorsRef.current }, colorName));
+        onChange(_.omit(colorsRef.current, colorName));
       }
     },
     [colorsRef, onChange],
@@ -120,4 +122,5 @@ const BrandColorRow = memo(function BrandColorRow({
   );
 });
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default BrandColorSettings;

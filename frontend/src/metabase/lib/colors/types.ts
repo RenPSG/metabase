@@ -1,4 +1,8 @@
-export type ColorPalette = Record<string, string>;
+import type { colors } from "./palette";
+
+export type ColorPalette = Partial<Record<keyof typeof colors, string>>;
+
+export type ColorName = keyof ColorPalette;
 
 export interface AccentColorOptions {
   main?: boolean;

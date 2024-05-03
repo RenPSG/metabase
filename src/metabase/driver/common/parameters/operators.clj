@@ -7,22 +7,24 @@
                26
                {:source-field 5}]]
      :value [3 5]}"
-  (:require [metabase.mbql.schema :as mbql.s]
-            [metabase.models.params :as params]
-            [metabase.query-processor.error-type :as qp.error-type]
-            [metabase.util.i18n :refer [tru]]
-            [schema.core :as s]))
+  (:require
+   [metabase.legacy-mbql.schema :as mbql.s]
+   [metabase.legacy-mbql.util :as mbql.u]
+   [metabase.lib.schema.parameter :as lib.schema.parameter]
+   [metabase.query-processor.error-type :as qp.error-type]
+   [metabase.util.i18n :refer [tru]]
+   [metabase.util.malli :as mu]))
 
-(s/defn ^:private operator-arity :- (s/maybe (s/enum :unary :binary :variadic))
+(mu/defn ^:private operator-arity :- [:maybe [:enum :unary :binary :variadic]]
   [param-type]
-  (get-in mbql.s/parameter-types [param-type :operator]))
+  (get-in lib.schema.parameter/types [param-type :operator]))
 
 (defn operator?
   "Returns whether param-type is an \"operator\" type."
   [param-type]
   (boolean (operator-arity param-type)))
 
-(s/defn ^:private verify-type-and-arity
+(mu/defn ^:private verify-type-and-arity
   [field param-type param-value]
   (letfn [(maybe-arity-error [n]
             (when (not= n (count param-value))
@@ -53,21 +55,24 @@
                        :field-id    (second field)
                        :type        qp.error-type/invalid-parameter})))))
 
-(s/defn to-clause :- mbql.s/Filter
+(mu/defn to-clause :- mbql.s/Filter
   "Convert an operator style parameter into an mbql clause. Will also do arity checks and throws an ex-info with
   `:type qp.error-type/invalid-parameter` if arity is incorrect."
-  [{param-type :type [a b :as param-value] :value [_ field :as _target] :target :as _param}]
+  [{param-type :type [a b :as param-value] :value [_ field :as _target] :target options :options :as _param}]
   (verify-type-and-arity field param-type param-value)
-  (let [field' (params/wrap-field-id-if-needed field)]
-    (condp = (operator-arity param-type)
+  (let [field' (mbql.u/wrap-field-id-if-needed field)]
+    (case (operator-arity param-type)
       :binary
-      [(keyword (name param-type)) field' a b]
+      (cond-> [(keyword (name param-type)) field' a b]
+        (boolean options) (conj options))
 
       :unary
-      [(keyword (name param-type)) field' a]
+      (cond-> [(keyword (name param-type)) field' a]
+        (boolean options) (conj options))
 
       :variadic
-      (into [(keyword (name param-type)) field'] param-value)
+      (cond-> (into [(keyword (name param-type)) field'] param-value)
+        (boolean options) (conj options))
 
       (throw (ex-info (format "Unrecognized operator: %s" param-type)
                       {:param-type param-type

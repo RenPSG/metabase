@@ -1,22 +1,24 @@
 (ns metabase.task.refresh-slack-channel-user-cache
-  (:require [clojure.tools.logging :as log]
-            [clojurewerkz.quartzite.jobs :as jobs]
-            [clojurewerkz.quartzite.schedule.cron :as cron]
-            [clojurewerkz.quartzite.schedule.simple :as simple]
-            [clojurewerkz.quartzite.triggers :as triggers]
-            [metabase.integrations.slack :as slack]
-            [metabase.task :as task]
-            [metabase.util.i18n :refer [trs]]))
+  (:require
+   [clojurewerkz.quartzite.jobs :as jobs]
+   [clojurewerkz.quartzite.schedule.cron :as cron]
+   [clojurewerkz.quartzite.schedule.simple :as simple]
+   [clojurewerkz.quartzite.triggers :as triggers]
+   [metabase.integrations.slack :as slack]
+   [metabase.task :as task]
+   [metabase.util.log :as log]))
+
+(set! *warn-on-reflection* true)
 
 (defn ^:private job []
   (if (slack/slack-configured?)
     (let [_        (log/info "Starting Slack user/channel startup cache refresh...")
           start-ms (System/currentTimeMillis)
           _        (slack/refresh-channels-and-usernames!)]
-      (log/info (trs "Slack user/channel startup cache refreshed with {0} entries, took {1}ms."
-                     (count (slack/slack-cached-channels-and-usernames))
-                     (- (System/currentTimeMillis) start-ms))))
-    (log/info (trs "Slack is not configured, not refreshing slack user/channel cache."))))
+      (log/infof "Slack user/channel startup cache refreshed with %s entries, took %sms."
+                 (count (:channels (slack/slack-cached-channels-and-usernames)))
+                 (- (System/currentTimeMillis) start-ms)))
+    (log/info "Slack is not configured, not refreshing slack user/channel cache.")))
 
 (def ^:private job-key "metabase.task.refresh-channel-cache.job")
 (def ^:private trigger-key "metabase.task.refresh-channel-cache.trigger")

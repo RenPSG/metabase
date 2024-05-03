@@ -1,17 +1,18 @@
 /* eslint-disable react/prop-types */
-import React, { Component } from "react";
+import cx from "classnames";
+import { Component } from "react";
 import { connect } from "react-redux";
 
-import S from "./UsefulQuestions.css";
-import D from "metabase/reference/components/Detail.css";
-import L from "metabase/components/List.css";
+import L from "metabase/components/List/List.module.css";
+import CS from "metabase/css/core/index.css";
+import { fetchTableMetadata } from "metabase/redux/metadata";
+import D from "metabase/reference/components/Detail.module.css";
+import FieldToGroupBy from "metabase/reference/components/FieldToGroupBy";
+import { getMetadata } from "metabase/selectors/metadata";
 
 import { getQuestionUrl } from "../utils";
 
-import FieldToGroupBy from "metabase/reference/components/FieldToGroupBy";
-
-import { fetchTableMetadata } from "metabase/redux/metadata";
-import { getMetadata } from "metabase/selectors/metadata";
+import S from "./UsefulQuestions.module.css";
 
 const mapDispatchToProps = {
   fetchTableMetadata,
@@ -23,27 +24,21 @@ const mapStateToProps = (state, props) => ({
 
 class FieldsToGroupBy extends Component {
   render() {
-    const {
-      fields,
-      databaseId,
-      metric,
-      title,
-      onChangeLocation,
-      metadata,
-    } = this.props;
+    const { fields, databaseId, metric, title, onChangeLocation, metadata } =
+      this.props;
 
     return (
       <div>
         <div className={D.detailBody}>
           <div className={D.detailTitle}>
-            <span className={D.detailName}>{title}</span>
+            <span>{title}</span>
           </div>
           <div className={S.usefulQuestions}>
             {fields &&
               Object.values(fields).map((field, index, fields) => (
                 <FieldToGroupBy
                   key={field.id}
-                  className="px1 mb1 rounded bg-light-hover"
+                  className={cx(CS.px1, CS.mb1, CS.rounded, CS.bgLightHover)}
                   iconClass={L.icon}
                   field={field}
                   metric={metric}

@@ -1,24 +1,26 @@
 /* eslint "react/prop-types": "error" */
 
-import React from "react";
-import PropTypes from "prop-types";
 import cx from "classnames";
+import PropTypes from "prop-types";
 import { connect } from "react-redux";
-import _ from "underscore";
 import { t, ngettext, msgid } from "ttag";
+import _ from "underscore";
 
-import Card from "metabase/components/Card";
-import Icon from "metabase/components/Icon";
 import Label from "metabase/components/type/Label";
 import Subhead from "metabase/components/type/Subhead";
-import Sidebar from "metabase/dashboard/components/Sidebar";
-import Tooltip from "metabase/components/Tooltip";
-
-import { formatHourAMPM, formatDay, formatFrame } from "metabase/lib/time";
-import { getActivePulseParameters } from "metabase/lib/pulse";
-
+import Tooltip from "metabase/core/components/Tooltip";
+import CS from "metabase/css/core/index.css";
+import { Sidebar } from "metabase/dashboard/components/Sidebar";
 import { getParameters } from "metabase/dashboard/selectors";
-import { SidebarActions } from "./PulsesListSidebar.styled";
+import {
+  formatDateTimeWithUnit,
+  formatTimeWithUnit,
+} from "metabase/lib/formatting";
+import { getActivePulseParameters } from "metabase/lib/pulse";
+import { formatFrame } from "metabase/lib/time";
+import { Icon } from "metabase/ui";
+
+import { PulseCard, SidebarActions } from "./PulsesListSidebar.styled";
 
 const mapStateToProps = (state, props) => {
   return {
@@ -38,14 +40,29 @@ function _PulsesListSidebar({
 }) {
   return (
     <Sidebar>
-      <div className="px4 pt3 flex justify-between align-center">
+      <div
+        className={cx(
+          CS.px4,
+          CS.pt3,
+          CS.flex,
+          CS.justifyBetween,
+          CS.alignCenter,
+        )}
+      >
         <Subhead>{t`Subscriptions`}</Subhead>
 
         <SidebarActions>
           <Tooltip tooltip={t`Set up a new schedule`}>
             <Icon
               name="add"
-              className="text-brand bg-light-hover rounded p1 cursor-pointer mr1"
+              className={cx(
+                CS.textBrand,
+                CS.bgLightHover,
+                CS.rounded,
+                CS.p1,
+                CS.cursorPointer,
+                CS.mr1,
+              )}
               size={18}
               onClick={createSubscription}
             />
@@ -53,52 +70,63 @@ function _PulsesListSidebar({
           <Tooltip tooltip={t`Close`}>
             <Icon
               name="close"
-              className="text-light bg-light-hover rounded p1 cursor-pointer"
+              className={cx(
+                CS.textLight,
+                CS.bgLightHover,
+                CS.rounded,
+                CS.p1,
+                CS.cursorPointer,
+              )}
               size={22}
               onClick={onCancel}
             />
           </Tooltip>
         </SidebarActions>
       </div>
-      <div className="my2 mx4">
+      <div className={cx(CS.my2, CS.mx4)}>
         {pulses.map(pulse => {
           const canEdit = canEditPulse(pulse, formInput);
 
           return (
-            <Card
+            <PulseCard
+              aria-label="Pulse Card"
               key={pulse.id}
               flat
-              className={cx("mb3", {
-                "cursor-pointer": canEdit,
-                "bg-brand-hover": canEdit,
-              })}
+              canEdit={canEdit}
               onClick={() =>
                 canEdit && editPulse(pulse, pulse.channels[0].channel_type)
               }
             >
               <div
-                className={cx("px3 py2 hover-parent hover--inherit", {
-                  "text-white-hover": canEdit,
+                className={cx(CS.px3, CS.py2, CS.hoverParent, CS.hoverInherit, {
+                  [CS.textWhiteHover]: canEdit,
                 })}
               >
-                <div className="flex align-center hover-child hover--inherit">
+                <div
+                  className={cx(
+                    CS.flex,
+                    CS.alignCenter,
+                    CS.hoverChild,
+                    CS.hoverInherit,
+                  )}
+                >
                   <Icon
                     name={
                       pulse.channels[0].channel_type === "email"
                         ? "mail"
                         : "slack"
                     }
-                    className="mr1"
+                    className={CS.mr1}
                     style={{ paddingBottom: "5px" }}
                     size={16}
                   />
-                  <Label className="hover-child hover--inherit">
+                  <Label className={cx(CS.hoverChild, CS.hoverInherit)}>
                     {friendlySchedule(pulse.channels[0])}
                   </Label>
                 </div>
                 <PulseDetails pulse={pulse} parameters={parameters} />
               </div>
-            </Card>
+            </PulseCard>
           );
         })}
       </div>
@@ -173,20 +201,41 @@ function PulseDetails({ pulse, parameters }) {
   const filterText = buildFilterText(pulse, parameters);
 
   return (
-    <div className="text-medium hover-child">
+    <div className={cx(CS.textMedium, CS.hoverChild)}>
       <ul
-        className="flex flex-column scroll-x scroll-y text-unspaced"
+        className={cx(
+          CS.flex,
+          CS.flexColumn,
+          CS.scrollX,
+          CS.scrollY,
+          CS.textUnspaced,
+        )}
         style={{ maxHeight: 130 }}
       >
         {recipientText && (
-          <li className="flex align-start mr1 text-bold text-medium hover-child hover--inherit">
+          <li
+            className={cx(
+              CS.flex,
+              CS.alignStart,
+              CS.mr1,
+              CS.textBold,
+              CS.textMedium,
+              CS.hoverChild,
+              CS.hoverInherit,
+            )}
+          >
             <Icon
               name="group"
-              className="text-medium hover-child hover--inherit"
+              className={cx(CS.textMedium, CS.hoverChild, CS.hoverInherit)}
               size={12}
             />
             <span
-              className="ml1 text-medium hover-child hover--inherit"
+              className={cx(
+                CS.ml1,
+                CS.textMedium,
+                CS.hoverChild,
+                CS.hoverInherit,
+              )}
               style={{ fontSize: "12px" }}
             >
               {recipientText}
@@ -194,14 +243,30 @@ function PulseDetails({ pulse, parameters }) {
           </li>
         )}
         {filterText && (
-          <li className="flex align-start mt1 mr1 text-bold text-medium hover-child hover--inherit">
+          <li
+            className={cx(
+              CS.flex,
+              CS.alignStart,
+              CS.mt1,
+              CS.mr1,
+              CS.textBold,
+              CS.textMedium,
+              CS.hoverChild,
+              CS.hoverInherit,
+            )}
+          >
             <Icon
               name="filter"
-              className="text-medium hover-child hover--inherit"
+              className={cx(CS.textMedium, CS.hoverChild, CS.hoverInherit)}
               size={12}
             />
             <span
-              className="ml1 text-medium hover-child hover--inherit"
+              className={cx(
+                CS.ml1,
+                CS.textMedium,
+                CS.hoverChild,
+                CS.hoverInherit,
+              )}
               style={{ fontSize: "12px" }}
             >
               {filterText}
@@ -243,21 +308,23 @@ function friendlySchedule(channel) {
       scheduleString += t`hourly`;
       break;
     case "daily": {
-      const ampm = formatHourAMPM(schedule_hour);
-      scheduleString += t`daily at ${ampm}`;
+      const hour = formatTimeWithUnit(schedule_hour, "hour-of-day");
+      scheduleString += t`daily at ${hour}`;
       break;
     }
     case "weekly": {
-      const ampm = formatHourAMPM(schedule_hour);
-      const day = formatDay(schedule_day);
-      scheduleString += t`${day} at ${ampm}`;
+      const hour = formatTimeWithUnit(schedule_hour, "hour-of-day");
+      const day = formatDateTimeWithUnit(schedule_day, "day-of-week");
+      scheduleString += t`${day} at ${hour}`;
       break;
     }
     case "monthly": {
-      const ampm = formatHourAMPM(schedule_hour);
-      const day = schedule_day ? formatDay(schedule_day) : "calendar day";
+      const hour = formatTimeWithUnit(schedule_hour, "hour-of-day");
+      const day = schedule_day
+        ? formatDateTimeWithUnit(schedule_day, "day-of-week")
+        : "calendar day";
       const frame = formatFrame(schedule_frame);
-      scheduleString += t`monthly on the ${frame} ${day} at ${ampm}`;
+      scheduleString += t`monthly on the ${frame} ${day} at ${hour}`;
       break;
     }
     default:

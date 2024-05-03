@@ -1,4 +1,6 @@
-import { Group, GroupsPermissions } from "metabase-types/api";
+import { DataPermissionValue } from "metabase/admin/permissions/types";
+import type { Group, GroupsPermissions } from "metabase-types/api";
+
 import {
   buildDownloadPermission,
   DOWNLOAD_PERMISSION_OPTIONS,
@@ -29,7 +31,7 @@ const getPermissionGraph = (downloadValue = "all"): GroupsPermissions =>
 
 const isAdmin = true;
 const isNotAdmin = false;
-const dataAccessPermissionValue = "all";
+const dataAccessPermissionValue = DataPermissionValue.UNRESTRICTED;
 
 const defaultGroup: Group = {
   id: defaultGroupId,
@@ -151,9 +153,8 @@ describe("buildDownloadPermission", () => {
         "schemas",
       );
 
-      const [downgradePermissionConfirmation] = permissionModel.confirmations(
-        "none",
-      );
+      const [downgradePermissionConfirmation] =
+        permissionModel.confirmations?.(DataPermissionValue.NONE) ?? [];
 
       expect(downgradePermissionConfirmation?.message).toBe(
         'The "All Users" group has a higher level of access than this, which will override this setting. You should limit or revoke the "All Users" group\'s access to this item.',
@@ -171,9 +172,8 @@ describe("buildDownloadPermission", () => {
         "schemas",
       );
 
-      const [downgradePermissionConfirmation] = permissionModel.confirmations(
-        "all",
-      );
+      const [downgradePermissionConfirmation] =
+        permissionModel.confirmations?.(DataPermissionValue.UNRESTRICTED) ?? [];
 
       expect(permissionModel.warning).toBe(
         'The "All Users" group has a higher level of access than this, which will override this setting. You should limit or revoke the "All Users" group\'s access to this item.',

@@ -1,13 +1,14 @@
 /* eslint "react/prop-types": "warn" */
-import React, { Component } from "react";
+import cx from "classnames";
 import PropTypes from "prop-types";
+import { Component } from "react";
 import { connect } from "react-redux";
 
-import MetricSidebar from "./MetricSidebar";
 import SidebarLayout from "metabase/components/SidebarLayout";
-import MetricQuestions from "metabase/reference/metrics/MetricQuestions";
-
+import CS from "metabase/css/core/index.css";
+import Questions from "metabase/entities/questions";
 import * as metadataActions from "metabase/redux/metadata";
+import MetricQuestions from "metabase/reference/metrics/MetricQuestions";
 import * as actions from "metabase/reference/reference";
 
 import {
@@ -18,7 +19,7 @@ import {
   getIsEditing,
 } from "../selectors";
 
-import Questions from "metabase/entities/questions";
+import MetricSidebar from "./MetricSidebar";
 
 const mapStateToProps = (state, props) => ({
   user: getUser(state, props),
@@ -66,7 +67,7 @@ class MetricQuestionsContainer extends Component {
 
     return (
       <SidebarLayout
-        className="flex-full relative"
+        className={cx(CS.flexFull, CS.relative)}
         style={isEditing ? { paddingTop: "43px" } : {}}
         sidebar={<MetricSidebar metric={metric} user={user} />}
       >

@@ -1,25 +1,47 @@
-import React, { useCallback } from "react";
+import { useCallback, useMemo } from "react";
+import { connect } from "react-redux";
 
-import { Collection } from "metabase-types/api";
-import { ANALYTICS_CONTEXT } from "metabase/collections/constants";
-import { Item, isItemPinned } from "metabase/collections/utils";
+import type {
+  CreateBookmark,
+  DeleteBookmark,
+  OnCopy,
+  OnMove,
+} from "metabase/collections/types";
+import {
+  canArchiveItem,
+  canMoveItem,
+  canPinItem,
+  canPreviewItem,
+  isItemPinned,
+  isPreviewEnabled,
+} from "metabase/collections/utils";
 import EventSandbox from "metabase/components/EventSandbox";
+import { canUseMetabotOnDatabase } from "metabase/metabot/utils";
+import { getSetting } from "metabase/selectors/settings";
+import type Database from "metabase-lib/v1/metadata/Database";
+import type { Bookmark, Collection, CollectionItem } from "metabase-types/api";
+import type { State } from "metabase-types/store";
 
 import { EntityItemMenu } from "./ActionMenu.styled";
-import { BookmarksType } from "metabase-types/api/bookmark";
 
-type Props = {
-  bookmarks?: BookmarksType;
-  createBookmark?: (id: string, collection: string) => void;
-  deleteBookmark?: (id: string, collection: string) => void;
+export interface ActionMenuProps {
   className?: string;
-  item: Item;
-  collection: Collection;
-  onCopy: (items: Item[]) => void;
-  onMove: (items: Item[]) => void;
-};
+  item: CollectionItem;
+  collection?: Collection;
+  databases?: Database[];
+  bookmarks?: Bookmark[];
+  onCopy?: OnCopy;
+  onMove?: OnMove;
+  createBookmark?: CreateBookmark;
+  deleteBookmark?: DeleteBookmark;
+}
 
-function getIsBookmarked(item: Item, bookmarks: BookmarksType) {
+interface ActionMenuStateProps {
+  isXrayEnabled: boolean;
+  isMetabotEnabled: boolean;
+}
+
+function getIsBookmarked(item: CollectionItem, bookmarks: Bookmark[]) {
   const normalizedItemModel = normalizeItemModel(item);
 
   return bookmarks.some(
@@ -30,45 +52,69 @@ function getIsBookmarked(item: Item, bookmarks: BookmarksType) {
 
 // If item.model is `dataset`, that is, this is a Model in a product sense,
 // let’s call it "card" because `card` and `dataset` are treated the same in the back-end.
-function normalizeItemModel(item: Item) {
+function normalizeItemModel(item: CollectionItem) {
   return item.model === "dataset" ? "card" : item.model;
 }
 
+function mapStateToProps(state: State): ActionMenuStateProps {
+  return {
+    isXrayEnabled: getSetting(state, "enable-xrays"),
+    isMetabotEnabled: getSetting(state, "is-metabot-enabled"),
+  };
+}
+
 function ActionMenu({
-  bookmarks,
-  createBookmark,
-  deleteBookmark,
   className,
   item,
+  databases,
+  bookmarks,
   collection,
+  isXrayEnabled,
+  isMetabotEnabled,
   onCopy,
   onMove,
-}: Props) {
+  createBookmark,
+  deleteBookmark,
+}: ActionMenuProps & ActionMenuStateProps) {
+  const database = databases?.find(({ id }) => id === item.database_id);
   const isBookmarked = bookmarks && getIsBookmarked(item, bookmarks);
+  const canPin = canPinItem(item, collection);
+  const canPreview = canPreviewItem(item, collection);
+  const canMove = canMoveItem(item, collection);
+  const canArchive = canArchiveItem(item, collection);
+  const canUseMetabot =
+    database != null && canUseMetabotOnDatabase(database) && isMetabotEnabled;
 
   const handlePin = useCallback(() => {
-    item.setPinned(!isItemPinned(item));
+    item.setPinned?.(!isItemPinned(item));
   }, [item]);
 
   const handleCopy = useCallback(() => {
-    onCopy([item]);
+    onCopy?.([item]);
   }, [item, onCopy]);
 
   const handleMove = useCallback(() => {
-    onMove([item]);
+    onMove?.([item]);
   }, [item, onMove]);
 
   const handleArchive = useCallback(() => {
-    item.setArchived(true);
+    item.setArchived?.(true);
   }, [item]);
 
-  const handleToggleBookmark = useCallback(() => {
-    const toggleBookmark = isBookmarked ? deleteBookmark : createBookmark;
-
-    const normalizedItemModel = normalizeItemModel(item);
-
-    toggleBookmark?.(item.id.toString(), normalizedItemModel);
+  const handleToggleBookmark = useMemo(() => {
+    if (!createBookmark && !deleteBookmark) {
+      return undefined;
+    }
+    const handler = () => {
+      const toggleBookmark = isBookmarked ? deleteBookmark : createBookmark;
+      toggleBookmark?.(item.id.toString(), normalizeItemModel(item));
+    };
+    return handler;
   }, [createBookmark, deleteBookmark, isBookmarked, item]);
+
+  const handleTogglePreview = useCallback(() => {
+    item?.setCollectionPreview?.(!isPreviewEnabled(item));
+  }, [item]);
 
   return (
     // this component is used within a `<Link>` component,
@@ -78,17 +124,18 @@ function ActionMenu({
         className={className}
         item={item}
         isBookmarked={isBookmarked}
-        onPin={collection.can_write ? handlePin : null}
-        onMove={collection.can_write && item.setCollection ? handleMove : null}
-        onCopy={item.copy ? handleCopy : null}
-        onArchive={
-          collection.can_write && item.setArchived ? handleArchive : null
-        }
+        isXrayEnabled={isXrayEnabled}
+        canUseMetabot={canUseMetabot}
+        onPin={canPin ? handlePin : undefined}
+        onMove={canMove ? handleMove : undefined}
+        onCopy={item.copy ? handleCopy : undefined}
+        onArchive={canArchive ? handleArchive : undefined}
         onToggleBookmark={handleToggleBookmark}
-        analyticsContext={ANALYTICS_CONTEXT}
+        onTogglePreview={canPreview ? handleTogglePreview : undefined}
       />
     </EventSandbox>
   );
 }
 
-export default ActionMenu;
+// eslint-disable-next-line import/no-default-export -- deprecated usage
+export default connect(mapStateToProps)(ActionMenu);

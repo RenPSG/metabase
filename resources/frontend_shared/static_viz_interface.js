@@ -1,109 +1,79 @@
 const toJSArray = a => {
-  var jsArray = [];
-  for (var i = 0; i < a.length; i++) {
+  const jsArray = [];
+  for (let i = 0; i < a.length; i++) {
     jsArray[i] = a[i];
   }
   return jsArray;
 };
 
 function toJSMap(m) {
-  var o = {};
-  for (var i = 0; i < m.length; i++) {
+  const o = {};
+  for (let i = 0; i < m.length; i++) {
     o[m[i][0]] = m[i][1];
   }
   return o;
 }
 
-function timeseries_line(data, labels, settings) {
-  return StaticViz.RenderChart("timeseries/line", {
-    data: toJSArray(data),
-    labels: toJSMap(labels),
+/**
+ * @deprecated use javascript_visualization instead
+ */
+function row_chart(settings, data, colors) {
+  return StaticViz.LegacyRenderChart("row", {
     settings: JSON.parse(settings),
-  });
-}
-
-function timeseries_bar(data, labels, settings) {
-  return StaticViz.RenderChart("timeseries/bar", {
-    data: toJSArray(data),
-    labels: toJSMap(labels),
-    settings: JSON.parse(settings),
-  });
-}
-
-function timeseries_area(data, labels, settings) {
-  return StaticViz.RenderChart("timeseries/area", {
-    data: toJSArray(data),
-    labels: toJSMap(labels),
-    settings: JSON.parse(settings),
-  });
-}
-
-function combo_chart(series, settings, colors) {
-  // Thinking of combo as similar to multiple, although they're different in BE
-  return StaticViz.RenderChart("combo-chart", {
-    series: JSON.parse(series),
-    settings: JSON.parse(settings),
+    data: JSON.parse(data),
     colors: JSON.parse(colors),
   });
 }
 
-function timeseries_waterfall(data, labels, settings) {
-  return StaticViz.RenderChart("timeseries/waterfall", {
-    data: toJSArray(data),
-    labels: toJSMap(labels),
-    settings: JSON.parse(settings),
+/**
+ * @deprecated use javascript_visualization instead
+ */
+function gauge(card, data) {
+  return StaticViz.LegacyRenderChart("gauge", {
+    card: JSON.parse(card),
+    data: JSON.parse(data),
   });
 }
 
 function funnel(data, settings) {
-  return StaticViz.RenderChart("funnel", {
+  return StaticViz.LegacyRenderChart("funnel", {
     data: JSON.parse(data),
     settings: JSON.parse(settings),
   });
 }
 
-function categorical_bar(data, labels, settings) {
-  return StaticViz.RenderChart("categorical/bar", {
-    data: toJSArray(data),
-    labels: toJSMap(labels),
-    settings: JSON.parse(settings),
-  });
-}
-
-function categorical_area(data, labels, settings) {
-  return StaticViz.RenderChart("categorical/area", {
-    data: toJSArray(data),
-    labels: toJSMap(labels),
-    settings: JSON.parse(settings),
-  });
-}
-
-function categorical_line(data, labels, settings) {
-  return StaticViz.RenderChart("categorical/line", {
-    data: toJSArray(data),
-    labels: toJSMap(labels),
-    settings: JSON.parse(settings),
-  });
-}
-
-function categorical_donut(rows, colors) {
-  return StaticViz.RenderChart("categorical/donut", {
+/**
+ * @deprecated use javascript_visualization instead
+ */
+function categorical_donut(rows, legendColors, settings) {
+  return StaticViz.LegacyRenderChart("categorical/donut", {
     data: toJSArray(rows),
-    colors: toJSMap(colors),
-  });
-}
-
-function categorical_waterfall(data, labels, settings) {
-  return StaticViz.RenderChart("categorical/waterfall", {
-    data: toJSArray(data),
-    labels: toJSMap(labels),
+    colors: toJSMap(legendColors),
     settings: JSON.parse(settings),
   });
 }
 
-function progress(data, settings) {
-  return StaticViz.RenderChart("progress", {
+/**
+ * @deprecated use javascript_visualization instead
+ */
+function progress(data, settings, instanceColors) {
+  return StaticViz.LegacyRenderChart("progress", {
     data: JSON.parse(data),
     settings: JSON.parse(settings),
+    colors: JSON.parse(instanceColors),
+  });
+}
+
+function javascript_visualization(rawSeries, dashcardSettings, colors) {
+  const content = StaticViz.RenderChart(
+    JSON.parse(rawSeries),
+    JSON.parse(dashcardSettings),
+    JSON.parse(colors),
+  );
+  const type = content.startsWith("<svg") ? "svg" : "html";
+
+  return JSON.stringify({
+    type,
+    content,
   });
 }

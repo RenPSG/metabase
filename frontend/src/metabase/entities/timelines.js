@@ -1,33 +1,75 @@
-import { t } from "ttag";
 import { updateIn } from "icepick";
+import { t } from "ttag";
 import _ from "underscore";
-import { TimelineSchema } from "metabase/schema";
-import { TimelineApi, TimelineEventApi } from "metabase/services";
-import { createEntity, undo } from "metabase/lib/entities";
-import { getDefaultTimeline, getTimelineName } from "metabase/lib/timelines";
-import { canonicalCollectionId } from "metabase/collections/utils";
-import TimelineEvents from "./timeline-events";
-import forms from "./timelines/forms";
 
+import { timelineApi, timelineEventApi } from "metabase/api";
+import { canonicalCollectionId } from "metabase/collections/utils";
+import {
+  createEntity,
+  entityCompatibleQuery,
+  undo,
+} from "metabase/lib/entities";
+import { getDefaultTimeline, getTimelineName } from "metabase/lib/timelines";
+import { TimelineSchema } from "metabase/schema";
+
+import TimelineEvents from "./timeline-events";
+
+/**
+ * @deprecated use "metabase/api" instead
+ */
 const Timelines = createEntity({
   name: "timelines",
   nameOne: "timeline",
   path: "/api/timeline",
   schema: TimelineSchema,
-  forms,
 
   api: {
-    list: (params, ...args) => {
-      return params.collectionId
-        ? TimelineApi.listForCollection(params, ...args)
-        : TimelineApi.list(params, ...args);
-    },
+    list: ({ collectionId, ...params } = {}, dispatch) =>
+      collectionId
+        ? entityCompatibleQuery(
+            { id: collectionId, ...params },
+            dispatch,
+            timelineApi.endpoints.listCollectionTimelines,
+          )
+        : entityCompatibleQuery(
+            params,
+            dispatch,
+            timelineApi.endpoints.listTimelines,
+          ),
+    get: (entityQuery, options, dispatch) =>
+      entityCompatibleQuery(
+        entityQuery,
+        dispatch,
+        timelineApi.endpoints.getTimeline,
+      ),
+    create: (entityQuery, dispatch) =>
+      entityCompatibleQuery(
+        entityQuery,
+        dispatch,
+        timelineApi.endpoints.createTimeline,
+      ),
+    update: (entityQuery, dispatch) =>
+      entityCompatibleQuery(
+        entityQuery,
+        dispatch,
+        timelineApi.endpoints.updateTimeline,
+      ),
+    delete: ({ id }, dispatch) =>
+      entityCompatibleQuery(id, dispatch, timelineApi.endpoints.deleteTimeline),
   },
 
   actions: {
     createWithEvent: (event, collection) => async dispatch => {
-      const timeline = await TimelineApi.create(getDefaultTimeline(collection));
-      await TimelineEventApi.create({ ...event, timeline_id: timeline.id });
+      const timeline = await entityCompatibleQuery(
+        getDefaultTimeline(collection),
+        dispatch,
+        timelineApi.endpoints.createTimeline,
+      );
+      await entityCompatibleQuery(
+        { ...event, timeline_id: timeline.id },
+        dispatch,
+        timelineEventApi.endpoints.createTimelineEvent,
+      );
 
       dispatch({ type: Timelines.actionTypes.INVALIDATE_LISTS_ACTION });
       dispatch({ type: TimelineEvents.actionTypes.INVALIDATE_LISTS_ACTION });
@@ -57,7 +99,7 @@ const Timelines = createEntity({
   },
 
   reducer: (state = {}, action) => {
-    if (action.type === TimelineEvents.actionTypes.CREATE) {
+    if (action.type === TimelineEvents.actionTypes.CREATE && !action.error) {
       const event = TimelineEvents.HACK_getObjectFromAction(action);
 
       return updateIn(state, [event.timeline_id, "events"], (eventIds = []) => {
@@ -65,7 +107,7 @@ const Timelines = createEntity({
       });
     }
 
-    if (action.type === TimelineEvents.actionTypes.UPDATE) {
+    if (action.type === TimelineEvents.actionTypes.UPDATE && !action.error) {
       const event = TimelineEvents.HACK_getObjectFromAction(action);
 
       return _.mapObject(state, timeline => {
@@ -84,7 +126,7 @@ const Timelines = createEntity({
       });
     }
 
-    if (action.type === TimelineEvents.actionTypes.DELETE) {
+    if (action.type === TimelineEvents.actionTypes.DELETE && !action.error) {
       const eventId = action.payload.result;
 
       return _.mapObject(state, timeline => {

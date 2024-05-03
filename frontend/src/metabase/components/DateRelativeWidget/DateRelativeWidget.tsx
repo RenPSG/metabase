@@ -1,7 +1,11 @@
-import React from "react";
-import { t } from "ttag";
 import cx from "classnames";
+import { Component } from "react";
+import { t } from "ttag";
 import _ from "underscore";
+
+import ButtonsS from "metabase/css/components/buttons.module.css";
+import CS from "metabase/css/core/index.css";
+import { DATE_MBQL_FILTER_MAPPING } from "metabase-lib/v1/parameters/constants";
 
 type Shortcut = {
   name: string;
@@ -46,9 +50,7 @@ type PredefinedRelativeDatePickerProps = {
   onFilterChange: (filter: any[]) => void;
 };
 
-export class PredefinedRelativeDatePicker extends React.Component<
-  PredefinedRelativeDatePickerProps
-> {
+export class PredefinedRelativeDatePicker extends Component<PredefinedRelativeDatePickerProps> {
   constructor(props: PredefinedRelativeDatePickerProps) {
     super(props);
 
@@ -82,19 +84,25 @@ export class PredefinedRelativeDatePicker extends React.Component<
 
   render() {
     return (
-      <div className="p1 pt2">
+      <div className={cx(CS.p1, CS.pt2)}>
         <section>
           {SHORTCUTS.map((s, index) => (
             <span
               key={index}
-              className={cx("inline-block half pb1", { pr1: index % 2 === 0 })}
+              className={cx(CS.inlineBlock, CS.half, CS.pb1, {
+                [CS.pr1]: index % 2 === 0,
+              })}
             >
               <button
                 key={index}
                 aria-selected={this.isSelectedShortcut(s)}
                 className={cx(
-                  "Button Button-normal Button--medium text-normal text-centered full",
-                  { "Button--purple": this.isSelectedShortcut(s) },
+                  ButtonsS.Button,
+                  ButtonsS.ButtonNormal,
+                  ButtonsS.ButtonMedium,
+                  CS.textNormal,
+                  CS.textCentered,
+                  CS.full,
                 )}
                 onClick={() => this.onSetShortcut(s)}
               >
@@ -106,21 +114,24 @@ export class PredefinedRelativeDatePicker extends React.Component<
         {Object.keys(RELATIVE_SHORTCUTS).map(sectionName => (
           <section key={sectionName}>
             <div
-              style={{}}
-              className="border-bottom text-uppercase flex layout-centered mb2"
+              className={cx(
+                CS.borderBottom,
+                CS.textUppercase,
+                CS.flex,
+                CS.layoutCentered,
+                CS.mb2,
+              )}
             >
               <h6
                 style={{
-                  position: "relative",
-                  backgroundColor: "white",
                   top: "6px",
                 }}
-                className="px2"
+                className={cx(CS.px2, CS.bgWhite, CS.relative)}
               >
                 {sectionName}
               </h6>
             </div>
-            <div className="flex">
+            <div className={CS.flex}>
               {RELATIVE_SHORTCUTS[sectionName].map((s, index) => (
                 <button
                   key={index}
@@ -132,10 +143,14 @@ export class PredefinedRelativeDatePicker extends React.Component<
                     s.name.toLowerCase()
                   }
                   className={cx(
-                    "Button Button-normal Button--medium flex-full mb1",
+                    ButtonsS.Button,
+                    ButtonsS.ButtonNormal,
+                    ButtonsS.ButtonMedium,
+                    CS.flexFull,
+                    CS.mb1,
                     {
-                      "Button--purple": this.isSelectedShortcut(s),
-                      mr1: index !== RELATIVE_SHORTCUTS[sectionName].length - 1,
+                      [CS.mr1]:
+                        index !== RELATIVE_SHORTCUTS[sectionName].length - 1,
                     },
                   )}
                   onClick={() => this.onSetShortcut(s)}
@@ -151,79 +166,29 @@ export class PredefinedRelativeDatePicker extends React.Component<
   }
 }
 
-type FilterMap = {
-  [name: string]: {
-    name: string;
-    mapping: any[];
-  };
-};
-
-// HACK: easiest way to get working with RelativeDatePicker
-const FILTERS: FilterMap = {
-  today: {
-    name: t`Today`,
-    mapping: ["=", null, ["relative-datetime", "current"]],
-  },
-  yesterday: {
-    name: t`Yesterday`,
-    mapping: ["=", null, ["relative-datetime", -1, "day"]],
-  },
-  past7days: {
-    name: t`Past 7 Days`,
-    mapping: ["time-interval", null, -7, "day"],
-  },
-  past30days: {
-    name: t`Past 30 Days`,
-    mapping: ["time-interval", null, -30, "day"],
-  },
-  lastweek: {
-    name: t`Last Week`,
-    mapping: ["time-interval", null, "last", "week"],
-  },
-  lastmonth: {
-    name: t`Last Month`,
-    mapping: ["time-interval", null, "last", "month"],
-  },
-  lastyear: {
-    name: t`Last Year`,
-    mapping: ["time-interval", null, "last", "year"],
-  },
-  thisweek: {
-    name: t`This Week`,
-    mapping: ["time-interval", null, "current", "week"],
-  },
-  thismonth: {
-    name: t`This Month`,
-    mapping: ["time-interval", null, "current", "month"],
-  },
-  thisyear: {
-    name: t`This Year`,
-    mapping: ["time-interval", null, "current", "year"],
-  },
-};
-
 type DateRelativeWidgetProps = {
   value: string;
   setValue: (v?: string) => void;
   onClose: () => void;
 };
 
-class DateRelativeWidget extends React.Component<DateRelativeWidgetProps> {
-  constructor(props: DateRelativeWidgetProps) {
-    super(props);
-  }
-
-  static format = (value: string) =>
-    FILTERS[value] ? FILTERS[value].name : "";
-
+export class DateRelativeWidget extends Component<DateRelativeWidgetProps> {
   render() {
     const { value, setValue, onClose } = this.props;
     return (
-      <div className="px1" style={{ maxWidth: 300 }}>
+      <div className={CS.px1} style={{ maxWidth: 300 }}>
         <PredefinedRelativeDatePicker
-          filter={FILTERS[value] ? FILTERS[value].mapping : [null, null]}
+          filter={
+            DATE_MBQL_FILTER_MAPPING[value]
+              ? DATE_MBQL_FILTER_MAPPING[value].mapping
+              : [null, null]
+          }
           onFilterChange={filter => {
-            setValue(_.findKey(FILTERS, f => _.isEqual(f.mapping, filter)));
+            setValue(
+              _.findKey(DATE_MBQL_FILTER_MAPPING, f =>
+                _.isEqual(f.mapping, filter),
+              ),
+            );
             onClose();
           }}
         />
@@ -231,5 +196,3 @@ class DateRelativeWidget extends React.Component<DateRelativeWidgetProps> {
     );
   }
 }
-
-export default DateRelativeWidget;

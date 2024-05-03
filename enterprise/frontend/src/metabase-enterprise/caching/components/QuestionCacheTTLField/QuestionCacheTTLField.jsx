@@ -1,8 +1,11 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { t } from "ttag";
 import PropTypes from "prop-types";
+import { useEffect, useMemo, useState } from "react";
+import { t } from "ttag";
+
 import { duration } from "metabase/lib/formatting";
+
 import { getQuestionsImplicitCacheTTL } from "../../utils";
+
 import {
   CacheTTLInput,
   CacheTTLExpandedField,
@@ -31,7 +34,7 @@ function getInitialMode(question, implicitCacheTTL) {
   return MODE.DEFAULT;
 }
 
-export function QuestionCacheTTLField({ field, question, ...props }) {
+function QuestionCacheTTLField({ field, question, ...props }) {
   const implicitCacheTTL = useMemo(
     () => getQuestionsImplicitCacheTTL(question),
     [question],
@@ -73,3 +76,5 @@ export function QuestionCacheTTLField({ field, question, ...props }) {
 }
 
 QuestionCacheTTLField.propTypes = propTypes;
+
+export default QuestionCacheTTLField;

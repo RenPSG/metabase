@@ -1,8 +1,11 @@
-import React, { useMemo, useState } from "react";
-import PropTypes from "prop-types";
 import styled from "@emotion/styled";
-import NativeQueryEditor from "metabase/query_builder/components/NativeQueryEditor";
+import PropTypes from "prop-types";
+import { memo, useMemo, useState } from "react";
+
 import { isReducedMotionPreferred } from "metabase/lib/dom";
+import NativeQueryEditor from "metabase/query_builder/components/NativeQueryEditor";
+import * as Lib from "metabase-lib";
+
 import ResizableNotebook from "./ResizableNotebook";
 
 const QueryEditorContainer = styled.div`
@@ -15,9 +18,18 @@ const propTypes = {
   question: PropTypes.object.isRequired,
   isActive: PropTypes.bool.isRequired, // if QB mode is set to "query"
   height: PropTypes.number.isRequired,
+  onSetDatabaseId: PropTypes.func,
 };
 
-function DatasetQueryEditor({ question: dataset, isActive, height, ...props }) {
+function DatasetQueryEditor({
+  question,
+  isActive,
+  height,
+  onSetDatabaseId,
+  ...props
+}) {
+  const { isNative } = Lib.queryDisplayInfo(question.query());
+
   const [isResizing, setResizing] = useState(false);
 
   const resizableBoxProps = useMemo(() => {
@@ -53,10 +65,11 @@ function DatasetQueryEditor({ question: dataset, isActive, height, ...props }) {
 
   return (
     <QueryEditorContainer isActive={isActive}>
-      {dataset.isNative() ? (
+      {isNative ? (
         <NativeQueryEditor
           {...props}
-          question={dataset}
+          question={question}
+          query={question.legacyQuery()} // memoized query
           isInitiallyOpen
           hasTopBar={isActive}
           hasEditingSidebar={isActive}
@@ -67,11 +80,12 @@ function DatasetQueryEditor({ question: dataset, isActive, height, ...props }) {
           // which can also cancel the expected query rerun
           // (see https://github.com/metabase/metabase/issues/19180)
           cancelQueryOnLeave={false}
+          onSetDatabaseId={onSetDatabaseId}
         />
       ) : (
         <ResizableNotebook
           {...props}
-          question={dataset}
+          question={question}
           isResizing={isResizing}
           resizableBoxProps={resizableBoxProps}
         />
@@ -82,9 +96,4 @@ function DatasetQueryEditor({ question: dataset, isActive, height, ...props }) {
 
 DatasetQueryEditor.propTypes = propTypes;
 
-export default React.memo(
-  DatasetQueryEditor,
-  // should prevent the editor from re-rendering in "metadata" mode
-  // when it's completely covered with the results table
-  (prevProps, nextProps) => prevProps.height === 0 && nextProps.height === 0,
-);
+export default memo(DatasetQueryEditor);

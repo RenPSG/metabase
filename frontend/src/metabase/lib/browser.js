@@ -1,5 +1,7 @@
 import querystring from "querystring";
 
+import { safeJsonParse } from "metabase/lib/utils";
+
 function parseQueryStringOptions(s) {
   const options = querystring.parse(s);
 
@@ -7,11 +9,16 @@ function parseQueryStringOptions(s) {
     if (options[name] === "") {
       options[name] = true;
     } else if (/^(true|false|-?\d+(\.\d+)?)$/.test(options[name])) {
-      options[name] = JSON.parse(options[name]);
+      options[name] = safeJsonParse(options[name]);
     }
   }
 
   return options;
+}
+
+export function isDesktopSafari() {
+  // from: https://stackoverflow.com/a/42189492/142317
+  return "safari" in window;
 }
 
 export function parseHashOptions(hash) {

@@ -1,37 +1,33 @@
 /* eslint "react/prop-types": 2 */
 
-import React from "react";
-import PropTypes from "prop-types";
-
-import _ from "underscore";
 import cx from "classnames";
+import PropTypes from "prop-types";
 import { t } from "ttag";
+import _ from "underscore";
 
 import CollapseSection from "metabase/components/CollapseSection";
+import CS from "metabase/css/core/index.css";
+import { getPulseParameters } from "metabase/lib/pulse";
 import ParametersList from "metabase/parameters/components/ParametersList";
-
-import { getValuePopulatedParameters } from "metabase/parameters/utils/parameter-values";
 import {
-  getPulseParameters,
-  getActivePulseParameters,
-} from "metabase/lib/pulse";
+  getDefaultValuePopulatedParameters,
+  PULSE_PARAM_USE_DEFAULT,
+} from "metabase-lib/v1/parameters/utils/parameter-values";
 
 function MutableParametersSection({
   className,
   parameters,
-  defaultParametersById,
   dashboard,
   pulse,
   setPulseParameters,
 }) {
   const pulseParameters = getPulseParameters(pulse);
-  const activeParameters = getActivePulseParameters(pulse, parameters);
-  const pulseParamValuesById = activeParameters.reduce((map, parameter) => {
+  const pulseParamValuesById = pulseParameters.reduce((map, parameter) => {
     map[parameter.id] = parameter.value;
     return map;
   }, {});
 
-  const valuePopulatedParameters = getValuePopulatedParameters(
+  const valuePopulatedParameters = getDefaultValuePopulatedParameters(
     parameters,
     pulseParamValuesById,
   );
@@ -42,7 +38,7 @@ function MutableParametersSection({
       parameter => parameter.id !== id,
     );
     const newParameters =
-      value == null
+      value === PULSE_PARAM_USE_DEFAULT
         ? filteredParameters
         : filteredParameters.concat({
             ...parameter,
@@ -57,10 +53,10 @@ function MutableParametersSection({
       header={<h4>{t`Set filter values for when this gets sent`}</h4>}
       className={cx(className)}
       initialState="expanded"
-      bodyClass="mt2"
+      bodyClass={CS.mt2}
     >
       <ParametersList
-        className="align-stretch row-gap-1"
+        className={cx(CS.alignStretch, CS.rowGap1)}
         vertical
         dashboard={dashboard}
         parameters={valuePopulatedParameters}
@@ -73,7 +69,6 @@ function MutableParametersSection({
 MutableParametersSection.propTypes = {
   className: PropTypes.string,
   parameters: PropTypes.array.isRequired,
-  defaultParametersById: PropTypes.object.isRequired,
   dashboard: PropTypes.object.isRequired,
   pulse: PropTypes.object.isRequired,
   setPulseParameters: PropTypes.func.isRequired,

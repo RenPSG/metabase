@@ -1,13 +1,14 @@
 (ns metabase.cmd.endpoint-dox
   "Implementation for the `api-documentation` command, which generates doc pages
   for API endpoints."
-  (:require [clojure.java.classpath :as classpath]
-            [clojure.java.io :as io]
-            [clojure.string :as str]
-            [clojure.tools.namespace.find :as ns.find]
-            [metabase.config :as config]
-            [metabase.plugins.classloader :as classloader]
-            [metabase.util :as u]))
+  (:require
+   [clojure.java.classpath :as classpath]
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [clojure.tools.namespace.find :as ns.find]
+   [metabase.config :as config]
+   [metabase.plugins.classloader :as classloader]
+   [metabase.util :as u]))
 
 ;;;; API docs intro
 
@@ -26,25 +27,15 @@
     (str/split endpoint #"metabase-enterprise.")
     (str/split endpoint #"\.")))
 
-(def initialisms "Used to format initialisms/acronyms in generated docs." '["SSO" "GTAP" "LDAP" "SQL" "JSON"])
+(def initialisms
+  "Used to format initialisms/acronyms in generated docs."
+  '["SSO" "SAML" "GTAP" "LDAP" "SQL" "JSON" "API" "LLM"])
 
 (defn capitalize-initialisms
   "Converts initialisms to upper case."
   [name initialisms]
-  (let [re (re-pattern (str "(?i)(?:" (str/join "|" initialisms) ")"))
-        matches (re-seq re name)]
-    (if matches
-      (reduce (fn [n m] (str/replace n m (str/upper-case m))) name matches)
-      name)))
-
-(defn ^:private capitalize-first-char
-  "Like string/capitalize, only it ignores the rest of the string
-  to retain case-sensitive capitalization, e.g., initialisms."
-  [s]
-  (if (< (count s) 2)
-    (str/upper-case s)
-    (str (str/upper-case (subs s 0 1))
-         (subs s 1))))
+  (let [re (re-pattern (str "(?i)(?:" (str/join "|" (map #(str % "\\b") initialisms)) ")"))]
+    (str/replace name re u/upper-case-en)))
 
 (defn- endpoint-ns-name
   "Creates a name for endpoints in a namespace, like all the endpoints for Alerts.
@@ -55,10 +46,44 @@
       name
       handle-enterprise-ns
       last
-      capitalize-first-char
+      u/capitalize-first-char
       (str/replace #"(.api.|-)" " ")
+      (str/replace ".api" "") ; account for `serialization.api` namespace
       (capitalize-initialisms initialisms)
       (str/replace "SSO SSO" "SSO")))
+
+(defn- handle-quotes
+  "Used for formatting YAML string punctuation for frontmatter descriptions."
+  [s]
+  (-> s
+      (str/replace #"\"" "'")
+      str/split-lines
+      (#(str/join "\n  " %))))
+
+(defn- format-frontmatter-description
+  "Formats description for YAML frontmatter."
+  [desc]
+  (str "|\n  " (handle-quotes desc)))
+
+(defn- get-description
+  "Used to grab namespace description, if it exists."
+  [ep ep-data]
+  (let [desc (-> ep-data
+                 first
+                 :ns
+                 meta
+                 :doc
+                 u/add-period)]
+    (if (str/blank? desc)
+      (u/add-period (str "API endpoints for " ep))
+      desc)))
+
+(defn- endpoint-page-frontmatter
+  "Formats frontmatter, which includes title and summary, if any."
+  [ep ep-data]
+  (let [desc (format-frontmatter-description (get-description ep ep-data))]
+    (str "---\ntitle: \"" ep "\""
+         "\nsummary: " desc "\n---\n\n")))
 
 (defn- endpoint-page-title
   "Creates a page title for a set of endpoints, e.g., `# Card`."
@@ -69,37 +94,11 @@
 
 (defn- endpoint-page-description
   "If there is a namespace docstring, include the docstring with a paragraph break."
-  [ep-data]
-  (let [desc (u/add-period (:doc (meta (:ns (first ep-data)))))]
+  [ep ep-data]
+  (let [desc (get-description ep ep-data)]
     (if (str/blank? desc)
       desc
       (str desc "\n\n"))))
-
-;;;; API endpoint page route table of contents
-
-(defn- anchor-link
-  "Converts an endpoint string to an anchor link, like [GET /api/alert](#get-apialert),
-  for use in tables of contents for endpoint routes."
-  [ep-name]
-  (let [al (-> (str "#" (str/lower-case ep-name))
-               (str/replace #"[/:%]" "")
-               (str/replace " " "-")
-               (#(str "(" % ")")))]
-    (str "[" ep-name "]" al)))
-
-(defn- toc-links
-  "Creates a list of links to endpoints in the relevant namespace."
-  [endpoint]
-  (-> (:endpoint-str endpoint)
-      (str/replace #"[#+`]" "")
-      str/trim
-      anchor-link
-      (#(str "  - " %))))
-
-(defn route-toc
-  "Generates a table of contents for routes in a page."
-  [ep-data]
-  (str (str/join "\n" (map toc-links ep-data)) "\n\n"))
 
 ;;;; API endpoints
 
@@ -117,15 +116,22 @@
   [endpoint]
   (assoc endpoint
          :endpoint-str (endpoint-str endpoint)
-         :ns-name  (endpoint-ns-name endpoint)))
+         :ns-name (endpoint-ns-name endpoint)))
+
+(def api-ns
+  "Regular expression to match endpoints. Needs to match namespaces like:
+   - metabase.api.search
+   - metabase-enterprise.serialization.api
+   - metabase.api.api-key"
+  (re-pattern "^metabase(?:-enterprise\\.[\\w-]+)?\\.api(?:\\.[\\w-]+)?$"))
 
 (defn- api-namespaces []
   (for [ns-symb (ns.find/find-namespaces (classpath/system-classpath))
-        :when   (and (re-find #"^metabase(?:-enterprise\.[\w-]+)?\.api\." (name ns-symb))
+        :when   (and (re-find api-ns (name ns-symb))
                      (not (str/includes? (name ns-symb) "test")))]
     ns-symb))
 
-(defn- collect-endpoints
+(defn collect-endpoints
   "Gets a list of all API endpoints."
   []
   (for [ns-symb     (api-namespaces)
@@ -143,7 +149,12 @@
 (defn- paid?
   "Is the endpoint a paid feature?"
   [ep-data]
-  (str/includes? (:endpoint-str (first ep-data)) "/api/ee"))
+  (or (str/includes? (:endpoint-str (first ep-data)) "/api/ee")
+      ;; some ee endpoints are inconsistent in naming, see #22687
+      (str/includes? (:endpoint-str (first ep-data)) "/api/mt")
+      (= 'metabase-enterprise.sandbox.api.table (ns-name (:ns (first ep-data))))
+      (str/includes? (:endpoint-str (first ep-data)) "/auth/sso")
+      (str/includes? (:endpoint-str (first ep-data)) "/api/moderation-review")))
 
 (defn endpoint-footer
   "Adds a footer with a link back to the API index."
@@ -158,9 +169,9 @@
   followed by the endpoint and their parameter descriptions."
   [ep ep-data]
   (apply str
+         (endpoint-page-frontmatter ep ep-data)
          (endpoint-page-title ep)
-         (endpoint-page-description ep-data)
-         (route-toc ep-data)
+         (endpoint-page-description ep ep-data)
          (endpoint-docs ep-data)
          (endpoint-footer ep-data)))
 
@@ -171,7 +182,7 @@
                  str/trim
                  (str/split #"\s+")
                  (#(str/join "-" %))
-                 str/lower-case)]
+                 u/lower-case-en)]
     (str dir file ext)))
 
 (defn build-endpoint-link
@@ -194,7 +205,9 @@
   (->> (collect-endpoints)
        (map process-endpoint)
        (group-by :ns-name)
-       (into (sorted-map))))
+       (into (sorted-map-by (fn [a b] (compare
+                                       (u/lower-case-en a)
+                                       (u/lower-case-en b)))))))
 
 ;;;; Page generators
 

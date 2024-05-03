@@ -1,31 +1,60 @@
 import { t } from "ttag";
-import _ from "underscore";
 
-import { Collection, CollectionId } from "metabase-types/api";
-
-export type Item = {
-  name: string;
-  description: string | null;
-  collection_position?: number | null;
-  id: number;
-  getIcon: () => { name: string };
-  getUrl: () => string;
-  setArchived: (isArchived: boolean) => void;
-  setPinned: (isPinned: boolean) => void;
-  copy?: boolean;
-  setCollection?: boolean;
-  model: string;
-};
+import { PLUGIN_COLLECTIONS } from "metabase/plugins";
+import type {
+  Collection,
+  CollectionId,
+  CollectionItem,
+} from "metabase-types/api";
 
 export function nonPersonalOrArchivedCollection(
   collection: Collection,
 ): boolean {
   // @TODO - should this be an API thing?
-  return !isPersonalCollection(collection) && !collection.archived;
+  return !isRootPersonalCollection(collection) && !collection.archived;
 }
 
-export function isPersonalCollection(collection: Collection): boolean {
+export function isRootPersonalCollection(
+  collection: Partial<Collection> | CollectionItem,
+): boolean {
   return typeof collection.personal_owner_id === "number";
+}
+
+export function isPersonalCollection(
+  collection: Pick<Collection, "is_personal">,
+) {
+  return collection.is_personal;
+}
+
+export function isPublicCollection(
+  collection: Pick<Collection, "is_personal">,
+) {
+  return !isPersonalCollection(collection);
+}
+
+export function isInstanceAnalyticsCollection(
+  collection?: Pick<Collection, "type">,
+): boolean {
+  return (
+    !!collection &&
+    PLUGIN_COLLECTIONS.getCollectionType(collection).type ===
+      "instance-analytics"
+  );
+}
+
+export function getInstanceAnalyticsCustomCollection(
+  collections: Collection[],
+): Collection | null {
+  return PLUGIN_COLLECTIONS.getInstanceAnalyticsCustomCollection(collections);
+}
+
+export function isInstanceAnalyticsCustomCollection(
+  collection: Collection,
+): boolean {
+  return (
+    PLUGIN_COLLECTIONS.CUSTOM_INSTANCE_ANALYTICS_COLLECTION_ENTITY_ID ===
+    collection.entity_id
+  );
 }
 
 // Replace the name for the current user's collection
@@ -50,12 +79,11 @@ export function currentUserPersonalCollections(
 
 function getNonRootParentId(collection: Collection) {
   if (Array.isArray(collection.effective_ancestors)) {
-    // eslint-disable-next-line no-unused-vars
-    const [root, nonRootParent] = collection.effective_ancestors;
+    const [, nonRootParent] = collection.effective_ancestors;
     return nonRootParent ? nonRootParent.id : undefined;
   }
   // location is a string like "/1/4" where numbers are parent collection IDs
-  const nonRootParentId = collection.location?.split("/")?.[0];
+  const nonRootParentId = collection.location?.split("/")?.[1];
   return canonicalCollectionId(nonRootParentId);
 }
 
@@ -71,12 +99,81 @@ export function isPersonalCollectionChild(
   return Boolean(parentCollection && !!parentCollection.personal_owner_id);
 }
 
-export function isRootCollection(collection: Collection): boolean {
-  return collection.id === "root";
+export function isPersonalCollectionOrChild(
+  collection: Collection,
+  collectionList: Collection[],
+): boolean {
+  return (
+    isRootPersonalCollection(collection) ||
+    isPersonalCollectionChild(collection, collectionList)
+  );
 }
 
-export function isItemPinned(item: Item) {
+export function isRootCollection(collection: Pick<Collection, "id">): boolean {
+  return canonicalCollectionId(collection?.id) === null;
+}
+
+export function isItemPinned(item: CollectionItem) {
   return item.collection_position != null;
+}
+
+export function isItemQuestion(item: CollectionItem) {
+  return item.model === "card";
+}
+
+export function isItemModel(item: CollectionItem) {
+  return item.model === "dataset";
+}
+
+export function isItemCollection(item: CollectionItem) {
+  return item.model === "collection";
+}
+
+export function isReadOnlyCollection(collection: CollectionItem) {
+  return isItemCollection(collection) && !collection.can_write;
+}
+
+export function canPinItem(item: CollectionItem, collection?: Collection) {
+  return collection?.can_write && item.setPinned != null;
+}
+
+export function canPreviewItem(item: CollectionItem, collection?: Collection) {
+  return collection?.can_write && isItemPinned(item) && isItemQuestion(item);
+}
+
+export function canMoveItem(item: CollectionItem, collection?: Collection) {
+  return (
+    collection?.can_write &&
+    !isReadOnlyCollection(item) &&
+    item.setCollection != null &&
+    !(isItemCollection(item) && isRootPersonalCollection(item))
+  );
+}
+
+export function canArchiveItem(item: CollectionItem, collection?: Collection) {
+  return (
+    collection?.can_write &&
+    !isReadOnlyCollection(item) &&
+    !(isItemCollection(item) && isRootPersonalCollection(item))
+  );
+}
+
+export function isPreviewShown(item: CollectionItem) {
+  return isPreviewEnabled(item) && isFullyParameterized(item);
+}
+
+export function isPreviewEnabled(item: CollectionItem) {
+  return item.collection_preview ?? true;
+}
+
+export function isFullyParameterized(item: CollectionItem) {
+  return item.fully_parameterized ?? true;
+}
+
+export function coerceCollectionId(
+  collectionId: CollectionId | null | undefined,
+): CollectionId {
+  return collectionId == null ? "root" : collectionId;
 }
 
 // API requires items in "root" collection be persisted with a "null" collection ID
@@ -84,11 +181,30 @@ export function isItemPinned(item: Item) {
 export function canonicalCollectionId(
   collectionId: string | number | null | undefined,
 ): number | null {
-  if (collectionId === "root" || collectionId == null) {
+  if (
+    collectionId === "root" ||
+    collectionId === null ||
+    collectionId === undefined
+  ) {
     return null;
   } else if (typeof collectionId === "number") {
     return collectionId;
   } else {
     return parseInt(collectionId, 10);
   }
+}
+
+export function isValidCollectionId(
+  collectionId: unknown,
+): collectionId is CollectionId {
+  if (
+    typeof collectionId !== "string" &&
+    typeof collectionId !== "number" &&
+    collectionId !== null &&
+    collectionId !== undefined
+  ) {
+    return false;
+  }
+  const id = canonicalCollectionId(collectionId);
+  return id === null || typeof id === "number";
 }

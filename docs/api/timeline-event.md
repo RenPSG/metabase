@@ -1,11 +1,12 @@
+---
+title: "Timeline event"
+summary: |
+  /api/timeline-event endpoints.
+---
+
 # Timeline event
 
 /api/timeline-event endpoints.
-
-  - [DELETE /api/timeline-event/:id](#delete-apitimeline-eventid)
-  - [GET /api/timeline-event/:id](#get-apitimeline-eventid)
-  - [POST /api/timeline-event/](#post-apitimeline-event)
-  - [PUT /api/timeline-event/:id](#put-apitimeline-eventid)
 
 ## `DELETE /api/timeline-event/:id`
 
@@ -13,7 +14,7 @@ Delete a [[TimelineEvent]].
 
 ### PARAMS:
 
-*  **`id`**
+*  **`id`** value must be an integer greater than zero.
 
 ## `GET /api/timeline-event/:id`
 
@@ -21,7 +22,7 @@ Fetch the [[TimelineEvent]] with `id`.
 
 ### PARAMS:
 
-*  **`id`**
+*  **`id`** value must be an integer greater than zero.
 
 ## `POST /api/timeline-event/`
 
@@ -31,23 +32,23 @@ Create a new [[TimelineEvent]].
 
 *  **`timestamp`** value must be a valid date string
 
-*  **`question_id`** value may be nil, or if non-nil, value must be an integer greater than zero.
+*  **`question_id`** nullable value must be an integer greater than zero.
 
-*  **`description`** value may be nil, or if non-nil, value must be a string.
+*  **`description`** nullable string
 
-*  **`archived`** value may be nil, or if non-nil, value must be a boolean.
+*  **`archived`** nullable boolean
 
-*  **`timezone`** value must be a string.
+*  **`timezone`** string
 
-*  **`time_matters`** value may be nil, or if non-nil, value must be a boolean.
+*  **`time_matters`** nullable boolean
 
 *  **`name`** value must be a non-blank string.
 
 *  **`timeline_id`** value must be an integer greater than zero.
 
-*  **`source`** value may be nil, or if non-nil, value must be one of: `collections`, `question`.
+*  **`source`** nullable enum of collections, question
 
-*  **`icon`** value may be nil, or if non-nil, value must be one of: `balloons`, `bell`, `cloud`, `mail`, `star`, `warning`.
+*  **`icon`** nullable enum of star, cake, mail, warning, bell, cloud
 
 ## `PUT /api/timeline-event/:id`
 
@@ -55,23 +56,23 @@ Update a [[TimelineEvent]].
 
 ### PARAMS:
 
-*  **`timestamp`** value may be nil, or if non-nil, value must be a valid date string
+*  **`timestamp`** nullable value must be a valid date string
 
-*  **`description`** value may be nil, or if non-nil, value must be a string.
+*  **`description`** nullable string
 
-*  **`archived`** value may be nil, or if non-nil, value must be a boolean.
+*  **`archived`** nullable boolean
 
-*  **`timezone`** value may be nil, or if non-nil, value must be a string.
+*  **`timezone`** nullable string
 
-*  **`time_matters`** value may be nil, or if non-nil, value must be a boolean.
+*  **`time_matters`** nullable boolean
 
-*  **`name`** value may be nil, or if non-nil, value must be a non-blank string.
+*  **`name`** nullable value must be a non-blank string.
 
-*  **`timeline_id`** value may be nil, or if non-nil, value must be an integer greater than zero.
+*  **`timeline_id`** nullable value must be an integer greater than zero.
 
-*  **`icon`** value may be nil, or if non-nil, value must be one of: `balloons`, `bell`, `cloud`, `mail`, `star`, `warning`.
+*  **`icon`** nullable enum of star, cake, mail, warning, bell, cloud
 
-*  **`id`** 
+*  **`id`** value must be an integer greater than zero.
 
 *  **`timeline-event-updates`**
 

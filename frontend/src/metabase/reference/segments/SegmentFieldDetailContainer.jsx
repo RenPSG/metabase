@@ -1,14 +1,14 @@
 /* eslint "react/prop-types": "warn" */
-import React, { Component } from "react";
+import cx from "classnames";
 import PropTypes from "prop-types";
+import { Component } from "react";
 import { connect } from "react-redux";
 
-import SegmentFieldSidebar from "./SegmentFieldSidebar";
 import SidebarLayout from "metabase/components/SidebarLayout";
-import SegmentFieldDetail from "metabase/reference/segments/SegmentFieldDetail";
-
+import CS from "metabase/css/core/index.css";
 import * as metadataActions from "metabase/redux/metadata";
 import * as actions from "metabase/reference/reference";
+import SegmentFieldDetail from "metabase/reference/segments/SegmentFieldDetail";
 
 import {
   getSegment,
@@ -17,6 +17,8 @@ import {
   getDatabaseId,
   getIsEditing,
 } from "../selectors";
+
+import SegmentFieldSidebar from "./SegmentFieldSidebar";
 
 const mapStateToProps = (state, props) => ({
   segment: getSegment(state, props),
@@ -63,7 +65,7 @@ class SegmentFieldDetailContainer extends Component {
 
     return (
       <SidebarLayout
-        className="flex-full relative"
+        className={cx(CS.flexFull, CS.relative)}
         style={isEditing ? { paddingTop: "43px" } : {}}
         sidebar={<SegmentFieldSidebar segment={segment} field={field} />}
       >

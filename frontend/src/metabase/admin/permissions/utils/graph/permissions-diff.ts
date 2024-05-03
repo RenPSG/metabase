@@ -1,10 +1,15 @@
-import _ from "underscore";
+import type Database from "metabase-lib/v1/metadata/Database";
+import type {
+  ConcreteTableId,
+  Group,
+  GroupsPermissions,
+} from "metabase-types/api";
 
-import { Group, GroupsPermissions } from "metabase-types/api";
-import Database from "metabase-lib/lib/metadata/Database";
+import { DataPermission } from "../../types";
+
 import {
   getFieldsPermission,
-  getNativePermission,
+  getSchemasPermission,
   isRestrictivePermission,
 } from "./data-permissions";
 
@@ -28,27 +33,33 @@ function diffDatabasePermissions(
     grantedTables: {},
     revokedTables: {},
   };
-  // get the native permisisons for this db
-  const oldNativePerm = getNativePermission(oldPerms, groupId, {
-    databaseId: database.id,
-  });
-  const newNativePerm = getNativePermission(newPerms, groupId, {
-    databaseId: database.id,
-  });
+  // get the native permissions for this db
+  const oldNativePerm = getSchemasPermission(
+    oldPerms,
+    groupId,
+    { databaseId: database.id },
+    DataPermission.CREATE_QUERIES,
+  );
+  const newNativePerm = getSchemasPermission(
+    newPerms,
+    groupId,
+    { databaseId: database.id },
+    DataPermission.CREATE_QUERIES,
+  );
   if (oldNativePerm !== newNativePerm) {
     databaseDiff.native = newNativePerm;
   }
   // check each table in this db
-  for (const table of database.tables) {
+  for (const table of database.tables ?? []) {
     const oldFieldsPerm = getFieldsPermission(
       oldPerms,
       groupId,
       {
         databaseId: database.id,
         schemaName: table.schema_name || "",
-        tableId: table.id,
+        tableId: table.id as ConcreteTableId,
       },
-      "data",
+      DataPermission.VIEW_DATA,
     );
     const newFieldsPerm = getFieldsPermission(
       newPerms,
@@ -56,9 +67,9 @@ function diffDatabasePermissions(
       {
         databaseId: database.id,
         schemaName: table.schema_name || "",
-        tableId: table.id,
+        tableId: table.id as ConcreteTableId,
       },
-      "data",
+      DataPermission.VIEW_DATA,
     );
     if (oldFieldsPerm !== newFieldsPerm) {
       if (isRestrictivePermission(newFieldsPerm)) {

@@ -1,4 +1,5 @@
-import {
+import type {
+  QueryBuilderDashboardState,
   QueryBuilderState,
   QueryBuilderUIControls,
 } from "metabase-types/store";
@@ -6,25 +7,34 @@ import {
 export const createMockQueryBuilderUIControlsState = (
   opts?: Partial<QueryBuilderUIControls>,
 ): QueryBuilderUIControls => ({
+  isModifiedFromNotebook: false,
   isShowingDataReference: false,
   isShowingTemplateTagsEditor: false,
   isShowingNewbModal: false,
-  isEditing: false,
   isRunning: false,
   isQueryComplete: false,
   isShowingSummarySidebar: false,
-  isShowingFilterSidebar: false,
   isShowingChartTypeSidebar: false,
   isShowingChartSettingsSidebar: false,
   isShowingQuestionDetailsSidebar: false,
   isShowingTimelineSidebar: false,
   initialChartSetting: null,
-  isPreviewing: true,
   isShowingRawTable: false,
+  isNativeEditorOpen: false,
   queryBuilderMode: "view",
   previousQueryBuilderMode: false,
   snippetCollectionId: null,
   datasetEditorTab: "query",
+  isShowingNotebookNativePreview: false,
+  notebookNativePreviewSidebarWidth: null,
+  ...opts,
+});
+
+export const createMockQueryBuilderDashboardState = (
+  opts?: Partial<QueryBuilderDashboardState>,
+): QueryBuilderDashboardState => ({
+  dashboardId: null,
+  isEditing: false,
   ...opts,
 });
 
@@ -37,6 +47,7 @@ export const createMockQueryBuilderState = (
     documentTitle: "",
     timeoutId: "",
   },
+  parentDashboard: createMockQueryBuilderDashboardState(),
 
   queryStatus: "complete",
   queryResults: null,
@@ -52,7 +63,6 @@ export const createMockQueryBuilderState = (
   zoomedRowObjectId: null,
   tableForeignKeyReferences: null,
 
-  visibleTimelineIds: [],
   selectedTimelineEventIds: [],
 
   metadataDiff: {},

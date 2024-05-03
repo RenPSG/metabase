@@ -1,14 +1,14 @@
 /* eslint "react/prop-types": "warn" */
-import React, { Component } from "react";
+import cx from "classnames";
 import PropTypes from "prop-types";
+import { Component } from "react";
 import { connect } from "react-redux";
 
-import SegmentSidebar from "./SegmentSidebar";
 import SidebarLayout from "metabase/components/SidebarLayout";
-import SegmentRevisions from "metabase/reference/segments/SegmentRevisions";
-
+import CS from "metabase/css/core/index.css";
 import * as metadataActions from "metabase/redux/metadata";
 import * as actions from "metabase/reference/reference";
+import SegmentRevisions from "metabase/reference/segments/SegmentRevisions";
 
 import {
   getUser,
@@ -17,6 +17,8 @@ import {
   getDatabaseId,
   getIsEditing,
 } from "../selectors";
+
+import SegmentSidebar from "./SegmentSidebar";
 
 const mapStateToProps = (state, props) => ({
   user: getUser(state, props),
@@ -66,7 +68,7 @@ class SegmentRevisionsContainer extends Component {
 
     return (
       <SidebarLayout
-        className="flex-full relative"
+        className={cx(CS.flexFull, CS.relative)}
         style={isEditing ? { paddingTop: "43px" } : {}}
         sidebar={<SegmentSidebar segment={segment} user={user} />}
       >

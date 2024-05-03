@@ -1,72 +1,57 @@
 (ns metabase.driver.sql-jdbc-test
-  (:require [clojure.test :refer :all]
-            [metabase.db.metadata-queries :as metadata-queries]
-            [metabase.driver :as driver]
-            [metabase.driver.sql-jdbc.test-util :as sql-jdbc.tu]
-            [metabase.driver.util :as driver.u]
-            [metabase.models.field :refer [Field]]
-            [metabase.models.table :as table :refer [Table]]
-            [metabase.query-processor :as qp]
-            [metabase.test :as mt]
-            [metabase.test.util.log :as tu.log]))
+  (:require
+   [clojure.set :as set]
+   [clojure.test :refer :all]
+   [metabase.db.metadata-queries :as metadata-queries]
+   [metabase.driver :as driver]
+   [metabase.driver.sql-jdbc.sync.describe-database
+    :as sql-jdbc.describe-database]
+   [metabase.driver.sql-jdbc.test-util :as sql-jdbc.tu]
+   [metabase.driver.util :as driver.u]
+   [metabase.models :refer [Database Field Table]]
+   [metabase.query-processor :as qp]
+   [metabase.query-processor.compile :as qp.compile]
+   [metabase.test :as mt]
+   [metabase.test.data.dataset-definition-test :as dataset-definition-test]
+   [metabase.util :as u]
+   [toucan2.core :as t2]
+   [toucan2.tools.with-temp :as t2.with-temp]))
 
-(deftest describe-database-test
-  (is (= {:tables (set (for [table ["CATEGORIES" "VENUES" "CHECKINS" "USERS"]]
+(set! *warn-on-reflection* true)
+
+(deftest ^:parallel describe-database-test
+  (is (= {:tables (set (for [table ["CATEGORIES" "VENUES" "CHECKINS" "USERS" "ORDERS" "PEOPLE" "PRODUCTS" "REVIEWS"]]
                          {:name table, :schema "PUBLIC", :description nil}))}
          (driver/describe-database :h2 (mt/db)))))
 
-(deftest describe-table-test
-  (is (= {:name   "VENUES"
-          :schema "PUBLIC"
-          :fields #{{:name              "ID"
-                     :database-type     "BIGINT"
-                     :base-type         :type/BigInteger
-                     :pk?               true
-                     :database-position 0}
-                    {:name              "NAME"
-                     :database-type     "VARCHAR"
-                     :base-type         :type/Text
-                     :database-position 1}
-                    {:name              "CATEGORY_ID"
-                     :database-type     "INTEGER"
-                     :base-type         :type/Integer
-                     :database-position 2}
-                    {:name              "LATITUDE"
-                     :database-type     "DOUBLE"
-                     :base-type         :type/Float
-                     :database-position 3}
-                    {:name              "LONGITUDE"
-                     :database-type     "DOUBLE"
-                     :base-type         :type/Float
-                     :database-position 4}
-                    {:name              "PRICE"
-                     :database-type     "INTEGER"
-                     :base-type         :type/Integer
-                     :database-position 5}}}
-         (driver/describe-table :h2 (mt/db) (Table (mt/id :venues))))))
+(deftest describe-fields-sync-with-composite-pks-test
+  (testing "Make sure syncing a table that has a composite pks works"
+    (mt/test-driver (mt/normal-drivers-with-feature :describe-fields)
+      (mt/dataset dataset-definition-test/composite-pk
+        (let [songs (t2/select-one :model/Table (mt/id :songs))
+              fk-metadata (driver/describe-fields :redshift (mt/db)
+                                                  :table-names [(:name songs)]
+                                                  :schema-names [(:schema songs)])]
+          (is (= #{{:name "song_id", :pk? true} {:name "artist_id", :pk? true}}
+                 (into #{}
+                       (map #(select-keys % [:name :pk?]))
+                       fk-metadata))))))))
 
-(deftest describe-table-fks-test
-  (is (= #{{:fk-column-name   "CATEGORY_ID"
-            :dest-table       {:name   "CATEGORIES"
-                               :schema "PUBLIC"}
-            :dest-column-name "ID"}}
-         (driver/describe-table-fks :h2 (mt/db) (Table (mt/id :venues))))))
-
-(deftest table-rows-sample-test
+(deftest ^:parallel table-rows-sample-test
   (mt/test-drivers (sql-jdbc.tu/sql-jdbc-drivers)
     (is (= [["20th Century Cafe"]
             ["25°"]
             ["33 Taps"]
             ["800 Degrees Neapolitan Pizzeria"]
             ["BCD Tofu House"]]
-           (->> (metadata-queries/table-rows-sample (Table (mt/id :venues))
-                  [(Field (mt/id :venues :name))]
+           (->> (metadata-queries/table-rows-sample (t2/select-one Table :id (mt/id :venues))
+                  [(t2/select-one Field :id (mt/id :venues :name))]
                   (constantly conj))
                 ;; since order is not guaranteed do some sorting here so we always get the same results
                 (sort-by first)
                 (take 5))))))
 
-(deftest table-rows-seq-test
+(deftest ^:parallel table-rows-seq-test
   (mt/test-drivers (sql-jdbc.tu/sql-jdbc-drivers)
     (is (= [{:name "Red Medicine", :price 3, :category_id 4, :id 1}
             {:name "Stout Burgers & Beers", :price 2, :category_id 11, :id 2}
@@ -75,14 +60,14 @@
             {:name "Brite Spot Family Restaurant", :price 2, :category_id 20, :id 5}]
            (for [row (take 5 (sort-by :id (driver/table-rows-seq driver/*driver*
                                                                  (mt/db)
-                                                                 (Table (mt/id :venues)))))]
+                                                                 (t2/select-one Table :id (mt/id :venues)))))]
              ;; different DBs use different precisions for these
              (-> (dissoc row :latitude :longitude)
                  (update :price int)
                  (update :category_id int)
                  (update :id int)))))))
 
-(deftest invalid-ssh-credentials-test
+(deftest ^:parallel invalid-ssh-credentials-test
   (mt/test-driver :postgres
     (testing "Make sure invalid ssh credentials are detected if a direct connection is possible"
       (is (thrown?
@@ -105,8 +90,7 @@
                             :tunnel-port    21212
                             :tunnel-user    "example"
                             :user           "postgres"}]
-               (tu.log/suppress-output
-                (driver.u/can-connect-with-details? :postgres details :throw-exceptions)))
+               (driver.u/can-connect-with-details? :postgres details :throw-exceptions))
              (catch Throwable e
                (loop [^Throwable e e]
                  (or (when (instance? java.net.ConnectException e)
@@ -115,7 +99,7 @@
 
 ;;; --------------------------------- Tests for splice-parameters-into-native-query ----------------------------------
 
-(deftest splice-parameters-native-test
+(deftest ^:parallel splice-parameters-native-test
   (mt/test-drivers (sql-jdbc.tu/sql-jdbc-drivers)
     (testing (str "test splicing a single param\n"
                   "(This test won't work if a driver that doesn't use single quotes for string literals comes along. "
@@ -156,7 +140,7 @@
                       :query    {:source-table (mt/id table)
                                  :aggregation  [[:count]]
                                  :filter       filter-clause}}
-        native-query (qp/compile-and-splice-parameters query)
+        native-query (qp.compile/compile-and-splice-parameters query)
         spliced      (driver/splice-parameters-into-native-query driver/*driver* native-query)]
     (ffirst
      (mt/formatted-rows [int]
@@ -165,7 +149,7 @@
          :type     :native
          :native   spliced})))))
 
-(deftest splice-parameters-mbql-test
+(deftest ^:parallel splice-parameters-mbql-test
   (testing "`splice-parameters-into-native-query` should generate a query that works correctly"
     (mt/test-drivers (sql-jdbc.tu/sql-jdbc-drivers)
       (mt/$ids venues
@@ -192,12 +176,53 @@
       (mt/$ids checkins
         (testing "splicing a date"
           (is (= 3
-                 (spliced-count-of :checkins [:= $date "2014-03-05"]))))))
+                 (spliced-count-of :checkins [:= $date "2014-03-05"])))))
+      (when (mt/supports-time-type? driver/*driver*)
+        (testing "splicing a time"
+          (mt/dataset time-test-data
+            (is (= 2
+                   (mt/$ids users
+                     (spliced-count-of :users [:= $last_login_time "09:30"]))))))))))
 
-    ;; Oracle, Redshift, and SparkSQL don't have 'Time' types
-    (mt/test-drivers (disj (sql-jdbc.tu/sql-jdbc-drivers) :oracle :redshift :sparksql)
-      (testing "splicing a time"
-        (is (= 2
-               (mt/dataset test-data-with-time
-                 (mt/$ids users
-                   (spliced-count-of :users [:= $last_login_time "09:30"])))))))))
+(defn- find-schema-filters-prop [driver]
+  (first (filter (fn [conn-prop]
+                   (= :schema-filters (keyword (:type conn-prop))))
+                 (driver/connection-properties driver))))
+
+(deftest syncable-schemas-with-schema-filters-test
+  (mt/test-drivers (set (for [driver (set/intersection (sql-jdbc.tu/sql-jdbc-drivers)
+                                                       (mt/normal-drivers-with-feature :actions))
+                              :when  (driver.u/find-schema-filters-prop driver)]
+                          driver))
+    (let [fake-schema-name (u/qualified-name ::fake-schema)]
+      (with-redefs [sql-jdbc.describe-database/all-schemas (let [orig sql-jdbc.describe-database/all-schemas]
+                                                             (fn [metadata]
+                                                               (eduction
+                                                                cat
+                                                                [(orig metadata) [fake-schema-name]])))]
+        (let [syncable (driver/syncable-schemas driver/*driver* (mt/db))]
+          (is (contains? syncable "public"))
+          (is (contains? syncable fake-schema-name))))
+      (let [driver             (driver.u/database->driver (mt/db))
+            schema-filter-prop (find-schema-filters-prop driver)
+            filter-type-prop   (keyword (str (:name schema-filter-prop) "-type"))
+            patterns-type-prop (keyword (str (:name schema-filter-prop) "-patterns"))]
+        (testing "syncable-schemas works as expected"
+          (testing "with an inclusion filter"
+            (t2.with-temp/with-temp [Database db-filtered {:engine  driver
+                                                           :details (-> (mt/db)
+                                                                        :details
+                                                                        (assoc filter-type-prop "inclusion"
+                                                                               patterns-type-prop "public"))}]
+              (let [syncable (driver/syncable-schemas driver/*driver* db-filtered)]
+                (is      (contains? syncable "public"))
+                (is (not (contains? syncable fake-schema-name))))))
+          (testing "with an exclusion filter"
+            (t2.with-temp/with-temp [Database db-filtered {:engine  driver
+                                                           :details (-> (mt/db)
+                                                                        :details
+                                                                        (assoc filter-type-prop "exclusion"
+                                                                               patterns-type-prop "public"))}]
+              (let [syncable (driver/syncable-schemas driver/*driver* db-filtered)]
+                (is (not (contains? syncable "public")))
+                (is (not (contains? syncable fake-schema-name)))))))))))

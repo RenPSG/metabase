@@ -1,4 +1,6 @@
+import querystring from "querystring";
 import _ from "underscore";
+
 import { isCypressActive } from "metabase/env";
 import MetabaseSettings from "metabase/lib/settings";
 
@@ -10,22 +12,22 @@ export const getScrollY = () =>
 
 // denotes whether the current page is loaded in an iframe or not
 // Cypress renders the whole app within an iframe, but we want to exlude it from this check to avoid certain components (like Nav bar) not rendering
-export const IFRAMED = (function() {
+export const isWithinIframe = function () {
   try {
     return !isCypressActive && window.self !== window.top;
   } catch (e) {
     return true;
   }
-})();
+};
 
 // add a global so we can check if the parent iframe is Metabase
 window.METABASE = true;
 
 // check that we're both iframed, and the parent is a Metabase instance
 // used for detecting if we're previewing an embed
-export const IFRAMED_IN_SELF = (function() {
+export const IFRAMED_IN_SELF = (function () {
   try {
-    return window.self !== window.top && window.top.METABASE;
+    return window.self !== window.parent && window.parent.METABASE;
   } catch (e) {
     return false;
   }
@@ -52,7 +54,7 @@ export const getScrollBarSize = _.memoize(() => {
 
 // check if we have access to localStorage to avoid handling "access denied"
 // exceptions
-export const HAS_LOCAL_STORAGE = (function() {
+export const HAS_LOCAL_STORAGE = (function () {
   try {
     window.localStorage; // This will trigger an exception if access is denied.
     return true;
@@ -193,33 +195,6 @@ function getTextNodeAtPosition(root, index) {
   };
 }
 
-// https://davidwalsh.name/add-rules-stylesheets
-const STYLE_SHEET = (function() {
-  // Create the <style> tag
-  const style = document.createElement("style");
-
-  // WebKit hack :(
-  style.appendChild(document.createTextNode("/* dynamic stylesheet */"));
-
-  // Add the <style> element to the page
-  document.head.appendChild(style);
-
-  return style.sheet;
-})();
-
-export function addCSSRule(selector, rules, index = 0) {
-  if ("insertRule" in STYLE_SHEET) {
-    const ruleIndex = STYLE_SHEET.insertRule(
-      selector + "{" + rules + "}",
-      index,
-    );
-    return STYLE_SHEET.cssRules[ruleIndex];
-  } else if ("addRule" in STYLE_SHEET) {
-    const ruleIndex = STYLE_SHEET.addRule(selector, rules, index);
-    return STYLE_SHEET.rules[ruleIndex];
-  }
-}
-
 export function constrainToScreen(element, direction, padding) {
   if (!element) {
     return false;
@@ -244,6 +219,42 @@ export function constrainToScreen(element, direction, padding) {
     throw new Error("Direction " + direction + " not implemented");
   }
   return false;
+}
+
+export function getSitePath() {
+  return new URL(MetabaseSettings.get("site-url")).pathname.toLowerCase();
+}
+
+function isMetabaseUrl(url) {
+  const urlPath = new URL(url, window.location.origin).pathname.toLowerCase();
+
+  if (!isAbsoluteUrl(url)) {
+    return true;
+  }
+
+  const pathNameWithoutSubPath = getPathnameWithoutSubPath(urlPath);
+  const isPublicLink = pathNameWithoutSubPath.startsWith("/public/");
+  const isEmbedding = pathNameWithoutSubPath.startsWith("/embed/");
+  /**
+   * (metabase#38640) We don't want to use client-side navigation for public links or embedding
+   * because public app, or embed app are built using separate routes.
+   **/
+  if (isPublicLink || isEmbedding) {
+    return false;
+  }
+
+  return isSameOrSiteUrlOrigin(url) && urlPath.startsWith(getSitePath());
+}
+
+function isAbsoluteUrl(url) {
+  return ["/", "http:", "https:", "mailto:"].some(prefix =>
+    url.startsWith(prefix),
+  );
+}
+
+function getWithSiteUrl(url) {
+  const siteUrl = MetabaseSettings.get("site-url");
+  return url.startsWith("/") ? siteUrl + url : url;
 }
 
 // Used for tackling Safari rendering issues
@@ -290,19 +301,29 @@ export function open(
     openInSameWindow = url => clickLink(url, false),
     // custom function for opening in new window
     openInBlankWindow = url => clickLink(url, true),
+    // custom function for opening in same app instance
+    openInSameOrigin,
+    ignoreSiteUrl = false,
     ...options
   } = {},
 ) {
+  url = ignoreSiteUrl ? url : getWithSiteUrl(url);
+
   if (shouldOpenInBlankWindow(url, options)) {
     openInBlankWindow(url);
+  } else if (isSameOrigin(url)) {
+    if (!isMetabaseUrl(url)) {
+      clickLink(url, false);
+    } else {
+      openInSameOrigin(getLocation(url));
+    }
   } else {
     openInSameWindow(url);
   }
 }
 
 export function openInBlankWindow(url) {
-  const siteUrl = MetabaseSettings.get("site-url");
-  clickLink(url.startsWith("/") ? siteUrl + url : url, true);
+  clickLink(getWithSiteUrl(url), true);
 }
 
 function clickLink(url, blank = false) {
@@ -340,20 +361,76 @@ export function shouldOpenInBlankWindow(
     return true;
   } else if (blankOnMetaOrCtrlKey && (isMetaKey || isCtrlKey)) {
     return true;
-  } else if (blankOnDifferentOrigin && !isSameOrigin(url)) {
+  } else if (blankOnDifferentOrigin && !isSameOrSiteUrlOrigin(url)) {
     return true;
   }
   return false;
 }
 
-const a = document.createElement("a"); // reuse the same tag for performance
+const getOrigin = url => {
+  try {
+    return new URL(url, window.location.origin).origin;
+  } catch {
+    return null;
+  }
+};
+
+const getLocation = url => {
+  try {
+    const { pathname, search, hash } = new URL(url, window.location.origin);
+    const query = querystring.parse(search.substring(1));
+    return {
+      pathname: getPathnameWithoutSubPath(pathname),
+      search,
+      query,
+      hash,
+    };
+  } catch {
+    return {};
+  }
+};
+
+function getPathnameWithoutSubPath(pathname) {
+  const pathnameSections = pathname.split("/");
+  const sitePathSections = getSitePath().split("/");
+
+  return isPathnameContainSitePath(pathnameSections, sitePathSections)
+    ? "/" + pathnameSections.slice(sitePathSections.length).join("/")
+    : pathname;
+}
+
+function isPathnameContainSitePath(pathnameSections, sitePathSections) {
+  for (let index = 0; index < sitePathSections.length; index++) {
+    const sitePathSection = sitePathSections[index].toLowerCase();
+    const pathnameSection = pathnameSections[index].toLowerCase();
+
+    if (sitePathSection !== pathnameSection) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export function isSameOrigin(url) {
-  a.href = url;
-  return a.origin === window.location.origin;
+  const origin = getOrigin(url);
+  return origin == null || origin === window.location.origin;
+}
+
+function isSiteUrlOrigin(url) {
+  const siteUrl = getOrigin(MetabaseSettings.get("site-url"));
+  const urlOrigin = getOrigin(url);
+  return siteUrl === urlOrigin;
+}
+
+// When a url is either has the same origin or it is the same with the site url
+// we want to open it in the same window (https://github.com/metabase/metabase/issues/24451)
+export function isSameOrSiteUrlOrigin(url) {
+  return isSameOrigin(url) || isSiteUrlOrigin(url);
 }
 
 export function getUrlTarget(url) {
-  return isSameOrigin(url) ? "_self" : "_blank";
+  return isSameOrSiteUrlOrigin(url) ? "_self" : "_blank";
 }
 
 export function removeAllChildren(element) {
@@ -391,8 +468,8 @@ export function clipPathReference(id) {
   return `url(${url})`;
 }
 
-export function initializeIframeResizer(readyCallback = () => {}) {
-  if (!IFRAMED) {
+export function initializeIframeResizer(onReady = () => {}) {
+  if (!isWithinIframe()) {
     return;
   }
 
@@ -400,12 +477,12 @@ export function initializeIframeResizer(readyCallback = () => {}) {
   // have their embeds autosize to their content
   if (window.iFrameResizer) {
     console.error("iFrameResizer resizer already defined.");
-    readyCallback();
+    onReady();
   } else {
     window.iFrameResizer = {
       autoResize: true,
       heightCalculationMethod: "max",
-      readyCallback: readyCallback,
+      onReady,
     };
 
     // FIXME: Crimes
@@ -436,7 +513,7 @@ export function isEventOverElement(event, element) {
 }
 
 export function isReducedMotionPreferred() {
-  const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const mediaQuery = window.matchMedia?.("(prefers-reduced-motion: reduce)");
   return mediaQuery && mediaQuery.matches;
 }
 
@@ -448,4 +525,36 @@ export function getMainElement() {
 export function isSmallScreen() {
   const mediaQuery = window.matchMedia("(max-width: 40em)");
   return mediaQuery && mediaQuery.matches;
+}
+
+/**
+ * @param {MouseEvent<Element, MouseEvent>} event
+ */
+export const getEventTarget = event => {
+  let target = document.getElementById("popover-event-target");
+  if (!target) {
+    target = document.createElement("div");
+    target.id = "popover-event-target";
+    document.body.appendChild(target);
+  }
+  target.style.left = event.clientX - 3 + "px";
+  target.style.top = event.clientY - 3 + "px";
+
+  return target;
+};
+
+/**
+ * Wrapper around window.location is used as we can't override window in jest with jsdom anymore
+ * https://github.com/jsdom/jsdom/issues/3492
+ */
+export function reload() {
+  window.location.reload();
+}
+
+/**
+ * Wrapper around window.location is used as we can't override window in jest with jsdom anymore
+ * https://github.com/jsdom/jsdom/issues/3492
+ */
+export function redirect(url) {
+  window.location.href = url;
 }

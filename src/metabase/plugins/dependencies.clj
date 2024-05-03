@@ -1,10 +1,13 @@
 (ns metabase.plugins.dependencies
-  (:require [clojure.string :as str]
-            [clojure.tools.logging :as log]
-            [environ.core :as env]
-            [metabase.plugins.classloader :as classloader]
-            [metabase.util :as u]
-            [metabase.util.i18n :refer [trs]]))
+  (:require
+   [clojure.string :as str]
+   [environ.core :as env]
+   [metabase.plugins.classloader :as classloader]
+   [metabase.util :as u]
+   [metabase.util.i18n :refer [trs]]
+   [metabase.util.log :as log]))
+
+(set! *warn-on-reflection* true)
 
 (def ^:private plugins-with-unsatisfied-deps
   (atom #{}))
@@ -22,9 +25,8 @@
 
 (defmethod dependency-satisfied? :default [_ {{plugin-name :name} :info} dep]
   (log/error
-   (u/format-color 'red
-       (trs "Plugin {0} declares a dependency that Metabase does not understand: {1}" plugin-name dep))
-   (trs "Refer to the plugin manifest reference for a complete list of valid plugin dependencies:")
+   (u/format-color :red "Plugin %s declares a dependency that Metabase does not understand: %s" plugin-name dep)
+   "Refer to the plugin manifest reference for a complete list of valid plugin dependencies:"
    "https://github.com/metabase/metabase/wiki/Metabase-Plugin-Manifest-Reference")
   false)
 

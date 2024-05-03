@@ -1,5 +1,5 @@
-import styled from "@emotion/styled";
 import { keyframes } from "@emotion/react";
+import styled from "@emotion/styled";
 
 const spinnerAnimation = keyframes`
   from {
@@ -11,6 +11,8 @@ const spinnerAnimation = keyframes`
 `;
 
 export const SpinnerRoot = styled.div`
+  display: flex;
+  align-items: center;
   font-size: 0;
 `;
 

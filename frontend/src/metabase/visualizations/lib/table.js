@@ -1,4 +1,4 @@
-import { isNumber, isCoordinate } from "metabase/lib/schema_metadata";
+import { isNumber, isCoordinate } from "metabase-lib/v1/types/utils/isa";
 
 export function getTableClickedObjectRowData(
   [series],
@@ -42,7 +42,8 @@ export function getTableCellClickedObject(
   if (isPivoted) {
     // if it's a pivot table, the first column is
     if (columnIndex === 0) {
-      return row._dimension;
+      const { value, column: col } = row._dimension;
+      return { value, column: col, settings, data: [{ value, col }] };
     } else {
       return {
         value,
@@ -84,7 +85,9 @@ export function getTableHeaderClickedObject(data, columnIndex, isPivoted) {
       return null; // FIXME?
     }
   } else {
-    return { column };
+    return {
+      column,
+    };
   }
 }
 

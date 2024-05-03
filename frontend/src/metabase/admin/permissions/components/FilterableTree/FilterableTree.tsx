@@ -1,11 +1,15 @@
+import { Fragment, useMemo, useState } from "react";
 import { t } from "ttag";
+
 import EmptyState from "metabase/components/EmptyState";
-import Icon from "metabase/components/Icon";
-import TextInput from "metabase/components/TextInput";
 import { Tree } from "metabase/components/tree";
+import type { ITreeNodeItem } from "metabase/components/tree/types";
+import type { InputProps } from "metabase/core/components/Input";
+import Input from "metabase/core/components/Input";
 import { useDebouncedValue } from "metabase/hooks/use-debounced-value";
 import { SEARCH_DEBOUNCE_DURATION } from "metabase/lib/constants";
-import React, { useMemo, useState } from "react";
+import type { IconName } from "metabase/ui";
+
 import {
   EmptyStateContainer,
   FilterableTreeContainer,
@@ -15,7 +19,6 @@ import {
   AdminTreeNode,
 } from "./FilterableTree.styled";
 import { searchItems } from "./utils";
-import { ITreeNodeItem } from "metabase/components/tree/types";
 
 interface FilterableTreeProps {
   selectedId?: ITreeNodeItem["id"];
@@ -23,7 +26,7 @@ interface FilterableTreeProps {
   itemGroups: ITreeNodeItem[][];
   emptyState?: {
     text: string;
-    icon: string;
+    icon: IconName;
   };
   onSelect: (item: ITreeNodeItem) => void;
 }
@@ -48,17 +51,20 @@ export const FilterableTree = ({
     return searchItems(itemGroups.flat(), trimmedFilter);
   }, [itemGroups, debouncedFilter]);
 
+  const handleFilterChange: InputProps["onChange"] = e =>
+    setFilter(e.target.value);
+
   return (
     <FilterableTreeRoot>
       <FilterInputContainer>
-        <TextInput
-          hasClearButton
-          colorScheme="admin"
+        <Input
+          fullWidth
           placeholder={placeholder}
-          onChange={setFilter}
           value={filter}
-          padding="sm"
-          icon={<Icon name="search" size={16} />}
+          leftIcon="search"
+          colorScheme="filter"
+          onChange={handleFilterChange}
+          onResetClick={() => setFilter("")}
         />
       </FilterInputContainer>
       <FilterableTreeContainer>
@@ -70,11 +76,9 @@ export const FilterableTree = ({
             TreeNode={AdminTreeNode}
             emptyState={
               <EmptyStateContainer>
-                {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
-                {/* @ts-ignore */}
                 <EmptyState
                   message={emptyState?.text ?? t`Nothing here`}
-                  icon={emptyState?.icon ?? "all"}
+                  icon={emptyState?.icon ?? "folder"}
                 />
               </EmptyStateContainer>
             }
@@ -84,7 +88,7 @@ export const FilterableTree = ({
           itemGroups.map((items, index) => {
             const isLastGroup = index === itemGroups.length - 1;
             return (
-              <React.Fragment key={index}>
+              <Fragment key={index}>
                 <Tree
                   data={items}
                   selectedId={selectedId}
@@ -92,7 +96,7 @@ export const FilterableTree = ({
                   TreeNode={AdminTreeNode}
                 />
                 {!isLastGroup && <ItemGroupsDivider />}
-              </React.Fragment>
+              </Fragment>
             );
           })}
       </FilterableTreeContainer>

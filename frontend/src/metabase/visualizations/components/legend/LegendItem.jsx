@@ -1,5 +1,11 @@
-import React, { memo } from "react";
+import cx from "classnames";
 import PropTypes from "prop-types";
+import { memo } from "react";
+
+import { Ellipsified } from "metabase/core/components/Ellipsified";
+import DashboardS from "metabase/css/dashboard.module.css";
+import EmbedFrameS from "metabase/public/components/EmbedFrame/EmbedFrame.module.css";
+
 import {
   LegendItemDot,
   LegendItemLabel,
@@ -7,7 +13,6 @@ import {
   LegendItemRoot,
   LegendItemTitle,
 } from "./LegendItem.styled";
-import Ellipsified from "metabase/core/components/Ellipsified";
 
 const propTypes = {
   label: PropTypes.string,
@@ -15,6 +20,7 @@ const propTypes = {
   color: PropTypes.string,
   isMuted: PropTypes.bool,
   isVertical: PropTypes.bool,
+  isReversed: PropTypes.bool,
   onHoverChange: PropTypes.func,
   onSelectSeries: PropTypes.func,
   onRemoveSeries: PropTypes.func,
@@ -26,12 +32,13 @@ const LegendItem = ({
   color,
   isMuted,
   isVertical,
+  isReversed,
   onHoverChange,
   onSelectSeries,
   onRemoveSeries,
 }) => {
   const handleItemClick = event => {
-    onSelectSeries && onSelectSeries(event, index);
+    onSelectSeries && onSelectSeries(event, index, isReversed);
   };
 
   const handleItemMouseEnter = event => {
@@ -55,7 +62,13 @@ const LegendItem = ({
         onMouseLeave={onHoverChange && handleItemMouseLeave}
       >
         <LegendItemDot color={color} />
-        <LegendItemTitle className="fullscreen-normal-text fullscreen-night-text">
+        <LegendItemTitle
+          className={cx(
+            DashboardS.fullscreenNormalText,
+            DashboardS.fullscreenNightText,
+            EmbedFrameS.fullscreenNightText,
+          )}
+        >
           <Ellipsified>{label}</Ellipsified>
         </LegendItemTitle>
       </LegendItemLabel>

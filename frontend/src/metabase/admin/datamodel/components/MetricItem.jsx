@@ -1,10 +1,12 @@
-import React, { Component } from "react";
+import cx from "classnames";
 import PropTypes from "prop-types";
+import { Component } from "react";
+import { t } from "ttag";
 
-import Icon from "metabase/components/Icon";
+import CS from "metabase/css/core/index.css";
+import { Icon } from "metabase/ui";
+
 import ObjectActionSelect from "./ObjectActionSelect";
-
-import { formatQueryDescription } from "metabase/lib/query/description";
 
 export default class MetricItem extends Component {
   static propTypes = {
@@ -15,24 +17,22 @@ export default class MetricItem extends Component {
   render() {
     const { metric, onRetire } = this.props;
 
-    const description = formatQueryDescription(metric.query_description, {
-      sections: ["table", "aggregation", "filter"],
-      jsx: true,
-    });
-
     return (
       <tr>
-        <td className="px1 py1 text-wrap">
-          <span className="flex align-center">
-            <Icon {...metric.getIcon()} size={12} className="mr1 text-medium" />
-            <span className="text-dark text-bold">{metric.name}</span>
+        <td className={cx(CS.px1, CS.py1, CS.textWrap)}>
+          <span className={cx(CS.flex, CS.alignCenter)}>
+            <Icon name="sum" className={cx(CS.mr1, CS.textMedium)} />
+            <span className={cx(CS.textDark, CS.textBold)}>{metric.name}</span>
           </span>
         </td>
-        <td className="px1 py1 text-wrap">{description}</td>
-        <td className="px1 py1 text-centered">
+        <td className={cx(CS.px1, CS.py1, CS.textWrap)}>
+          {metric.definition_description}
+        </td>
+        <td className={cx(CS.px1, CS.py1, CS.textCentered)}>
           <ObjectActionSelect
             object={metric}
             objectType="metric"
+            objectTypeLocalized={t`Metric`}
             onRetire={onRetire}
           />
         </td>

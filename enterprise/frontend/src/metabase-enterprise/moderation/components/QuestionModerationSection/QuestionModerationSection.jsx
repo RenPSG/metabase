@@ -1,23 +1,16 @@
-import React from "react";
 import PropTypes from "prop-types";
-import { t } from "ttag";
+import { Fragment } from "react";
 import { connect } from "react-redux";
 
-import { color } from "metabase/lib/colors";
-
-import {
-  MODERATION_STATUS,
-  getLatestModerationReview,
-  getStatusIcon,
-  isItemVerified,
-} from "metabase-enterprise/moderation/service";
-import { getIsModerator } from "metabase-enterprise/moderation/selectors";
 import {
   verifyCard,
   removeCardReview,
 } from "metabase-enterprise/moderation/actions";
+import { getIsModerator } from "metabase-enterprise/moderation/selectors";
+import { getLatestModerationReview } from "metabase-enterprise/moderation/service";
 
 import ModerationReviewBanner from "../ModerationReviewBanner/ModerationReviewBanner";
+
 import { VerifyButton as DefaultVerifyButton } from "./QuestionModerationSection.styled";
 
 const mapStateToProps = (state, props) => ({
@@ -44,27 +37,15 @@ QuestionModerationSection.propTypes = {
   VerifyButton: PropTypes.func,
 };
 
-const { name: verifiedIconName, color: verifiedIconColor } = getStatusIcon(
-  MODERATION_STATUS.verified,
-);
-
 function QuestionModerationSection({
   question,
-  verifyCard,
   removeCardReview,
   isModerator,
   reviewBannerClassName,
-  VerifyButton = DefaultVerifyButton,
 }) {
   const latestModerationReview = getLatestModerationReview(
     question.getModerationReviews(),
   );
-  const isVerified = isItemVerified(latestModerationReview);
-
-  const onVerify = () => {
-    const id = question.id();
-    verifyCard(id);
-  };
 
   const onRemoveModerationReview = () => {
     const id = question.id();
@@ -72,26 +53,14 @@ function QuestionModerationSection({
   };
 
   return (
-    <React.Fragment>
-      {isModerator && !isVerified && (
-        <VerifyButton
-          icon={verifiedIconName}
-          iconColor={color(verifiedIconColor)}
-          onClick={onVerify}
-          data-testid="moderation-verify-action"
-        >
-          {question.isDataset()
-            ? t`Verify this model`
-            : t`Verify this question`}
-        </VerifyButton>
-      )}
+    <Fragment>
       {latestModerationReview && (
         <ModerationReviewBanner
           className={reviewBannerClassName}
           moderationReview={latestModerationReview}
-          onRemove={isModerator && onRemoveModerationReview}
+          onRemove={isModerator ? onRemoveModerationReview : undefined}
         />
       )}
-    </React.Fragment>
+    </Fragment>
   );
 }

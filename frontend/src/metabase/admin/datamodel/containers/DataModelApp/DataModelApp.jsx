@@ -1,16 +1,15 @@
-import React, { useMemo } from "react";
 import PropTypes from "prop-types";
-import { push } from "react-router-redux";
+import { Fragment, useMemo } from "react";
 import { connect } from "react-redux";
+import { push } from "react-router-redux";
 import { t } from "ttag";
 
-import { useToggle } from "metabase/hooks/use-toggle";
-
 import Radio from "metabase/core/components/Radio";
+import { useToggle } from "metabase/hooks/use-toggle";
 import { getUserIsAdmin } from "metabase/selectors/user";
 
-import { ModelEducationalModal } from "./ModelEducationalModal";
 import { NavBar, ModelEducationButton } from "./DataModelApp.styled";
+import { ModelEducationalModal } from "./ModelEducationalModal";
 
 const propTypes = {
   onChangeTab: PropTypes.func.isRequired,
@@ -67,7 +66,7 @@ function DataModelApp({
   ];
 
   return (
-    <React.Fragment>
+    <Fragment>
       <NavBar>
         <Radio
           value={currentTab}
@@ -84,7 +83,7 @@ function DataModelApp({
         onClose={hideModelEducationalModal}
       />
       {children}
-    </React.Fragment>
+    </Fragment>
   );
 }
 

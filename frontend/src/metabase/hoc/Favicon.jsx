@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import _ from "underscore";
+import { useEffect } from "react";
+
 import MetabaseSettings from "../lib/settings";
 
 const DEFAULT_FAVICON = () => MetabaseSettings.get("application-favicon-url");
@@ -18,6 +18,9 @@ const resolveFavicon = (setterOrGetter, props) => {
   }
 };
 
+/**
+ * @deprecated HOCs are deprecated
+ */
 const withFavicon = faviconSetterOrGetter => ComposedComponent => {
   const WithFavicon = props => {
     const favicon = resolveFavicon(faviconSetterOrGetter, props);

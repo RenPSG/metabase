@@ -1,18 +1,16 @@
-import React from "react";
 import PropTypes from "prop-types";
 
 import Badge from "metabase/components/Badge";
-
 import Collection from "metabase/entities/collections";
 import { PLUGIN_COLLECTIONS } from "metabase/plugins";
 
 const propTypes = {
-  collection: PropTypes.object,
-  analyticsContext: PropTypes.string,
   className: PropTypes.string,
+  collection: PropTypes.object,
+  isSingleLine: PropTypes.bool,
 };
 
-const IRREGULAR_ICON_WIDTH = 14;
+const IRREGULAR_ICON_WIDTH = 16;
 const IRREGULAR_ICON_PROPS = {
   width: IRREGULAR_ICON_WIDTH,
   height: 16,
@@ -21,7 +19,7 @@ const IRREGULAR_ICON_PROPS = {
   targetOffsetX: IRREGULAR_ICON_WIDTH,
 };
 
-function CollectionBadge({ collection, analyticsContext, className }) {
+function CollectionBadge({ className, collection, isSingleLine }) {
   if (!collection) {
     return null;
   }
@@ -29,16 +27,16 @@ function CollectionBadge({ collection, analyticsContext, className }) {
   const isRegular = PLUGIN_COLLECTIONS.isRegularCollection(collection);
   const icon = {
     ...collection.getIcon(),
-    ...(isRegular ? { size: 12 } : IRREGULAR_ICON_PROPS),
+    ...(isRegular ? { size: 16 } : IRREGULAR_ICON_PROPS),
   };
   return (
     <Badge
+      className={className}
       to={collection.getUrl()}
       icon={icon}
       activeColor={icon.color}
       inactiveColor="text-light"
-      className={className}
-      data-metabase-event={`${analyticsContext};Collection Badge Click`}
+      isSingleLine={isSingleLine}
     >
       {collection.getName()}
     </Badge>

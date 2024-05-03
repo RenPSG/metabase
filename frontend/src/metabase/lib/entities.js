@@ -68,6 +68,14 @@
  *   )(BookContainer);
  */
 
+import { createSelector } from "@reduxjs/toolkit";
+import { getIn, merge } from "icepick";
+import inflection from "inflection"; // NOTE: need to use inflection directly here due to circular dependency
+import { normalize, denormalize, schema } from "normalizr";
+import createCachedSelector from "re-reselect";
+import _ from "underscore";
+
+import { GET, PUT, POST, DELETE } from "metabase/lib/api";
 import {
   combineReducers,
   handleEntities,
@@ -77,21 +85,14 @@ import {
   withRequestState,
   withCachedDataAndRequestState,
 } from "metabase/lib/redux";
-import createCachedSelector from "re-reselect";
-
-import { addUndo } from "metabase/redux/undo";
 import requestsReducer, { setRequestUnloaded } from "metabase/redux/requests";
+import { addUndo } from "metabase/redux/undo";
 
-import { GET, PUT, POST, DELETE } from "metabase/lib/api";
+const EMPTY_ENTITY_QUERY = {};
 
-// NOTE: need to use inflection directly here due to circular dependency
-import inflection from "inflection";
-
-import { createSelector } from "reselect";
-import { normalize, denormalize, schema } from "normalizr";
-import { getIn, merge } from "icepick";
-import _ from "underscore";
-
+/**
+ * @deprecated use "metabase/api" instead
+ */
 export function createEntity(def) {
   const entity = { ...def };
 
@@ -168,7 +169,7 @@ export function createEntity(def) {
 
   // normalize helpers
   entity.normalize = (object, schema = entity.schema) => ({
-    // include raw `object` (and alias under nameOne) for convienence
+    // include raw `object` (and alias under nameOne) for convenience
     object,
     [entity.nameOne]: object,
     // include standard normalizr properties, `result` and `entities`
@@ -176,7 +177,7 @@ export function createEntity(def) {
   });
 
   entity.normalizeList = (list, schema = entity.schema) => ({
-    // include raw `list` (and alias under nameMany) for convienence
+    // include raw `list` (and alias under nameMany) for convenience
     list,
     [entity.nameMany]: list,
     // include standard normalizr properties, `result` and `entities`
@@ -219,8 +220,12 @@ export function createEntity(def) {
         entityQuery => getQueryKey(entityQuery),
       ),
       withEntityActionDecorators("fetch"),
-    )((entityQuery, options = {}) => async (dispatch, getState) =>
-      entity.normalize(await entity.api.get(entityQuery, options)),
+    )(
+      (entityQuery, options = {}) =>
+        async (dispatch, getState) =>
+          entity.normalize(
+            await entity.api.get(entityQuery, options, dispatch, getState),
+          ),
     ),
 
     create: compose(
@@ -230,7 +235,11 @@ export function createEntity(def) {
       withEntityActionDecorators("create"),
     )(entityObject => async (dispatch, getState) => {
       return entity.normalize(
-        await entity.api.create(getWritableProperties(entityObject)),
+        await entity.api.create(
+          getWritableProperties(entityObject),
+          dispatch,
+          getState,
+        ),
       );
     }),
 
@@ -240,52 +249,54 @@ export function createEntity(def) {
       withEntityRequestState(object => [object.id, "update"]),
       withEntityActionDecorators("update"),
     )(
-      (entityObject, updatedObject = null, { notify } = {}) => async (
-        dispatch,
-        getState,
-      ) => {
-        // save the original object for undo
-        const originalObject = entity.selectors.getObject(getState(), {
-          entityId: entityObject.id,
-        });
-        // If a second object is provided just take the id from the first and
-        // update it with all the properties in the second
-        // NOTE: this is so that the object.update(updatedObject) method on
-        // the default entity wrapper class works correctly
-        if (updatedObject) {
-          entityObject = { id: entityObject.id, ...updatedObject };
-        }
-
-        const result = entity.normalize(
-          await entity.api.update(getWritableProperties(entityObject)),
-        );
-
-        if (notify) {
-          if (notify.undo) {
-            // pick only the attributes that were updated
-            const undoObject = _.pick(
-              originalObject,
-              ...Object.keys(updatedObject || {}),
-            );
-            dispatch(
-              addUndo({
-                actions: [
-                  entity.objectActions.update(
-                    entityObject,
-                    undoObject,
-                    // don't show an undo for the undo
-                    { notify: false },
-                  ),
-                ],
-                ...notify,
-              }),
-            );
-          } else {
-            dispatch(addUndo(notify));
+      (entityObject, updatedObject = null, { notify } = {}) =>
+        async (dispatch, getState) => {
+          // save the original object for undo
+          const originalObject = getObject(getState(), {
+            entityId: entityObject.id,
+          });
+          // If a second object is provided just take the id from the first and
+          // update it with all the properties in the second
+          // NOTE: this is so that the object.update(updatedObject) method on
+          // the default entity wrapper class works correctly
+          if (updatedObject) {
+            entityObject = { id: entityObject.id, ...updatedObject };
           }
-        }
-        return result;
-      },
+
+          const result = entity.normalize(
+            await entity.api.update(
+              getWritableProperties(entityObject),
+              dispatch,
+              getState,
+            ),
+          );
+
+          if (notify) {
+            if (notify.undo) {
+              // pick only the attributes that were updated
+              const undoObject = _.pick(
+                originalObject,
+                ...Object.keys(updatedObject || {}),
+              );
+              dispatch(
+                addUndo({
+                  actions: [
+                    entity.objectActions.update(
+                      entityObject,
+                      undoObject,
+                      // don't show an undo for the undo
+                      { notify: false },
+                    ),
+                  ],
+                  ...notify,
+                }),
+              );
+            } else {
+              dispatch(addUndo(notify));
+            }
+          }
+          return result;
+        },
     ),
 
     delete: compose(
@@ -294,7 +305,7 @@ export function createEntity(def) {
       withEntityRequestState(object => [object.id, "delete"]),
       withEntityActionDecorators("delete"),
     )(entityObject => async (dispatch, getState) => {
-      await entity.api.delete(entityObject);
+      await entity.api.delete(entityObject, dispatch, getState);
       return {
         entities: { [entity.name]: { [entityObject.id]: null } },
         result: entityObject.id,
@@ -314,7 +325,11 @@ export function createEntity(def) {
         entityQuery => [...getListStatePath(entityQuery), "fetch"],
       ),
     )((entityQuery = null) => async (dispatch, getState) => {
-      const fetched = await entity.api.list(entityQuery || {});
+      const fetched = await entity.api.list(
+        entityQuery || EMPTY_ENTITY_QUERY,
+        dispatch,
+        getState,
+      );
       // for now at least paginated endpoints have a 'data' property that
       // contains the actual entries, if that is on the response we should
       // use that as the 'results'
@@ -353,7 +368,7 @@ export function createEntity(def) {
   // HACK: the above actions return the normalizr results
   // (i.e. { entities, result }) rather than the loaded object(s), except
   // for fetch and fetchList when the data is cached, in which case it returns
-  // the noralized object.
+  // the normalized object.
   //
   // This is a problem when we use the result of one of the actions as though
   // though the action creator was an API client.
@@ -384,6 +399,7 @@ export function createEntity(def) {
   // SELECTORS
 
   const getEntities = state => state.entities;
+  const getSettings = state => state.settings;
 
   // OBJECT SELECTORS
 
@@ -394,7 +410,11 @@ export function createEntity(def) {
     [getEntities, getEntityId],
     (entities, entityId) => denormalize(entityId, entity.schema, entities),
   )((state, { entityId } = {}) =>
-    typeof entityId === "object" ? JSON.stringify(entityId) : entityId,
+    typeof entityId === "object"
+      ? JSON.stringify(entityId)
+      : entityId
+      ? entityId
+      : "",
   ); // must stringify objects
 
   // LIST SELECTORS
@@ -423,16 +443,18 @@ export function createEntity(def) {
   );
 
   const getList = createCachedSelector(
-    [getEntities, getEntityIds],
+    [getEntities, getEntityIds, getSettings],
     // delegate to getObject
-    (entities, entityIds) =>
+    (entities, entityIds, settings) =>
       entityIds &&
       entityIds
-        .map(entityId => entity.selectors.getObject({ entities }, { entityId }))
+        .map(entityId =>
+          entity.selectors.getObject({ entities, settings }, { entityId }),
+        )
         .filter(e => e != null), // deleted entities might remain in lists,
-  )((state, { entityQuery } = {}) => {
-    return entityQuery ? JSON.stringify(entityQuery) : "";
-  });
+  )((state, { entityQuery } = {}) =>
+    entityQuery ? JSON.stringify(entityQuery) : "",
+  );
 
   // REQUEST STATE SELECTORS
 
@@ -472,6 +494,7 @@ export function createEntity(def) {
   );
 
   const defaultSelectors = {
+    getEntityIds,
     getList,
     getObject,
     getFetched,
@@ -590,7 +613,7 @@ export function createEntity(def) {
     // object selectors
     for (const [methodName, method] of Object.entries(entity.objectSelectors)) {
       if (method) {
-        EntityWrapper.prototype[methodName] = function(...args) {
+        EntityWrapper.prototype[methodName] = function (...args) {
           return method(this, ...args);
         };
       }
@@ -598,7 +621,7 @@ export function createEntity(def) {
     // object actions
     for (const [methodName, method] of Object.entries(entity.objectActions)) {
       if (method) {
-        EntityWrapper.prototype[methodName] = function(...args) {
+        EntityWrapper.prototype[methodName] = function (...args) {
           if (this._dispatch) {
             // if dispatch was provided to the constructor go ahead and dispatch
             return this._dispatch(method(this, ...args));
@@ -658,33 +681,12 @@ export const notify = (opts = {}, subject, verb) =>
 export const undo = (opts = {}, subject, verb) =>
   merge({ notify: { subject, verb, undo: true } }, opts || {});
 
-// decorator versions disabled due to incompatibility with current version of flow
-//
-// // merges in options to give an object action a notification
-// export function notify(subject: string, verb: string, undo: boolean = false) {
-//   return function(target: Object, name: string, descriptor: any) {
-//     // https://github.com/loganfsmyth/babel-plugin-transform-decorators-legacy/issues/34
-//     const original = descriptor.initializer
-//       ? descriptor.initializer()
-//       : descriptor.value;
-//     delete descriptor.initializer;
-//     descriptor.value = function(o, arg, opts = {}) {
-//       opts = merge(
-//         {
-//           notify: {
-//             subject: typeof subject === "function" ? subject(o, arg) : subject,
-//             verb: typeof verb === "function" ? verb(o, arg) : verb,
-//             undo,
-//           },
-//         },
-//         opts,
-//       );
-//       return original(o, arg, opts);
-//     };
-//   };
-// }
-//
-// // merges in options to give make object action undo-able
-// export function undo(subject: string, verb: string) {
-//   return notify(subject, verb, true);
-// }
+export async function entityCompatibleQuery(entityQuery, dispatch, endpoint) {
+  const request = entityQuery === EMPTY_ENTITY_QUERY ? undefined : entityQuery;
+  const action = dispatch(endpoint.initiate(request, { forceRefetch: true }));
+  try {
+    return await action.unwrap();
+  } finally {
+    action.unsubscribe();
+  }
+}

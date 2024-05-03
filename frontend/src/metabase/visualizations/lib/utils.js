@@ -1,9 +1,10 @@
-import _ from "underscore";
+import crossfilter from "crossfilter";
 import d3 from "d3";
 import { t } from "ttag";
-import crossfilter from "crossfilter";
+import _ from "underscore";
 
-import { isDimension, isMetric, isDate } from "metabase/lib/schema_metadata";
+import { isNotNull } from "metabase/lib/types";
+import { isDimension, isMetric, isDate } from "metabase-lib/v1/types/utils/isa";
 
 export const MAX_SERIES = 100;
 
@@ -62,8 +63,13 @@ export function getAvailableCanvasWidth(element) {
 
 function generateSplits(list, left = [], right = [], depth = 0) {
   // NOTE: currently generates all permutations, some of which are equivalent
-  if (list.length === 0 || depth > SPLIT_AXIS_MAX_DEPTH) {
+  if (list.length === 0) {
     return [[left, right]];
+  } else if (depth > SPLIT_AXIS_MAX_DEPTH) {
+    // If we reach our max depth, we need to ensure that any item that haven't been added either list are accounted for
+    return left.length < right.length
+      ? [[left.concat(list), right]]
+      : [[left, right.concat(list)]];
   } else {
     return [
       ...generateSplits(
@@ -186,9 +192,8 @@ export function colorShade(hex, shade = 0) {
   if (!match) {
     return hex;
   }
-  const components = (match[1] != null
-    ? match.slice(1, 4)
-    : match.slice(4, 7)
+  const components = (
+    match[1] != null ? match.slice(1, 4) : match.slice(4, 7)
   ).map(d => parseInt(d, 16));
   const min = Math.min(...components);
   const max = Math.max(...components);
@@ -272,11 +277,12 @@ export function getDefaultDimensionAndMetric(series) {
   };
 }
 
-export function getDefaultDimensionsAndMetrics(
-  [{ data }],
+export function getSingleSeriesDimensionsAndMetrics(
+  series,
   maxDimensions = 2,
   maxMetrics = Infinity,
 ) {
+  const { data } = series;
   if (!data) {
     return {
       dimensions: [null],
@@ -335,6 +341,18 @@ export function getDefaultDimensionsAndMetrics(
   };
 }
 
+export function getDefaultDimensionsAndMetrics(
+  rawSeries,
+  maxDimensions = 2,
+  maxMetrics = Infinity,
+) {
+  return getSingleSeriesDimensionsAndMetrics(
+    rawSeries[0],
+    maxDimensions,
+    maxMetrics,
+  );
+}
+
 // Figure out how many decimal places are needed to represent the smallest
 // values in the chart with a certain number of significant digits.
 export function computeMaxDecimalsForValues(values, options) {
@@ -390,4 +408,32 @@ export const preserveExistingColumnsOrder = (prevColumns, newColumns) => {
   }
 
   return mergedColumnsResult;
+};
+
+export function getCardKey(cardId) {
+  return `${cardId ?? "unsaved"}`;
+}
+
+const PIVOT_SENSIBLE_MAX_CARDINALITY = 16;
+
+export const getDefaultPivotColumn = (cols, rows) => {
+  const columnsWithCardinality = cols
+    .map((column, index) => {
+      if (!isDimension(column)) {
+        return null;
+      }
+
+      const cardinality = getColumnCardinality(cols, rows, index);
+      if (cardinality > PIVOT_SENSIBLE_MAX_CARDINALITY) {
+        return null;
+      }
+
+      return { column, cardinality };
+    })
+    .filter(isNotNull);
+
+  return (
+    _.min(columnsWithCardinality, ({ cardinality }) => cardinality)?.column ??
+    null
+  );
 };

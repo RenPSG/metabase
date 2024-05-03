@@ -1,9 +1,8 @@
-import React, { Fragment } from "react";
-import { Line, Polygon } from "@visx/shape";
 import { Group } from "@visx/group";
-import { Text } from "metabase/static-viz/components/Text";
-import { measureTextHeight } from "metabase/static-viz/lib/text";
-import {
+import { Line, Polygon } from "@visx/shape";
+import { Fragment } from "react";
+
+import type {
   FunnelDatum,
   FunnelSettings,
 } from "metabase/static-viz/components/FunnelChart/types";
@@ -12,7 +11,11 @@ import {
   calculateFunnelSteps,
   calculateStepOpacity,
   getFormattedStep,
+  reorderData,
 } from "metabase/static-viz/components/FunnelChart/utils/funnel";
+import { Text } from "metabase/static-viz/components/Text";
+import { measureTextHeight } from "metabase/static-viz/lib/text";
+
 import { calculateMargin } from "./utils/margin";
 
 const layout = {
@@ -35,7 +38,7 @@ const layout = {
   percentBottomOffset: 24,
 };
 
-type FunnelProps = {
+export type FunnelProps = {
   data: FunnelDatum[];
   settings: FunnelSettings;
 };
@@ -43,8 +46,10 @@ type FunnelProps = {
 const Funnel = ({ data, settings }: FunnelProps) => {
   const palette = { ...layout.colors, ...settings.colors };
 
+  const reorderedData = reorderData(data, settings);
+
   const margin = calculateMargin(
-    data[0],
+    reorderedData[0],
     layout.stepFontSize,
     layout.percentFontSize,
     layout.measureFontSize,
@@ -59,13 +64,17 @@ const Funnel = ({ data, settings }: FunnelProps) => {
   const stepWidth = (layout.width - margin.left) / (data.length - 1);
   const maxStepTextWidth = stepWidth - layout.stepTextOffset * 2;
 
-  const steps = calculateFunnelSteps(data, stepWidth, funnelHeight);
+  const steps = calculateFunnelSteps(reorderedData, stepWidth, funnelHeight);
 
   const firstMeasureTop = margin.top + steps[0].top + steps[0].height / 2;
   const stepLabelTop = firstMeasureTop + measureTextHeight(layout.nameFontSize);
 
   return (
-    <svg width={layout.width} height={layout.height}>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width={layout.width}
+      height={layout.height}
+    >
       <Group left={margin.left}>
         {steps.map((step, index) => {
           const isFirst = index === 0;
@@ -166,4 +175,5 @@ const Funnel = ({ data, settings }: FunnelProps) => {
   );
 };
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default Funnel;

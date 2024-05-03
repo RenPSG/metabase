@@ -2,23 +2,20 @@ import slugg from "slugg";
 
 import { serializeCardForUrl } from "metabase/lib/card";
 import MetabaseSettings from "metabase/lib/settings";
+import type { QuestionCreatorOpts } from "metabase-lib/v1/Question";
+import Question from "metabase-lib/v1/Question";
+import * as ML_Urls from "metabase-lib/v1/urls";
+import type { CardId, Card as SavedCard } from "metabase-types/api";
 
-import Question, { QuestionCreatorOpts } from "metabase-lib/lib/Question";
-import { Card as BaseCard } from "metabase-types/types/Card";
+import { appendSlug, getEncodedUrlSearchParams } from "./utils";
 
-import { appendSlug, extractQueryParams } from "./utils";
-
-type Card = Partial<BaseCard> & {
-  id?: number | string;
-  card_id?: string;
-  name?: string;
+type Card = Partial<SavedCard> & {
+  card_id?: CardId | string;
   model?: "card" | "dataset";
-  dataset?: boolean;
 };
 
-export const newQuestionFlow = () => "/question/new";
-
-type QuestionUrlBuilderParams = {
+export type QuestionUrlBuilderParams = {
+  mode?: "view" | "notebook";
   hash?: Card | string;
   query?: Record<string, unknown> | string;
   objectId?: number | string;
@@ -26,17 +23,19 @@ type QuestionUrlBuilderParams = {
 
 export function question(
   card: Card | null,
-  { hash = "", query = "", objectId }: QuestionUrlBuilderParams = {},
+  {
+    mode = "view",
+    hash = "",
+    query = "",
+    objectId,
+  }: QuestionUrlBuilderParams = {},
 ) {
   if (hash && typeof hash === "object") {
     hash = serializeCardForUrl(hash);
   }
 
   if (query && typeof query === "object") {
-    query = extractQueryParams(query)
-      .filter(([key, value]) => value !== undefined)
-      .map(kv => kv.map(encodeURIComponent).join("="))
-      .join("&");
+    query = String(getEncodedUrlSearchParams(query));
   }
 
   if (hash && hash.charAt(0) !== "#") {
@@ -47,13 +46,15 @@ export function question(
     query = "?" + query;
   }
 
+  const isModel = card?.type === "model" || card?.model === "dataset";
+  const fallbackPath = isModel ? "model" : "question";
+  let path: string = card?.type ?? fallbackPath;
+
   if (!card || !card.id) {
-    return `/question${query}${hash}`;
+    return `/${path}${query}${hash}`;
   }
 
   const { card_id, id, name } = card;
-  let path = card?.dataset || card?.model === "dataset" ? "model" : "question";
-
   /**
    * If the question has been added to the dashboard we're reading the dashCard's properties.
    * In that case `card_id` is the actual question's id, while `id` corresponds with the dashCard itself.
@@ -73,7 +74,9 @@ export function question(
     path = appendSlug(path, slugg(name));
   }
 
-  if (objectId) {
+  if (mode === "notebook") {
+    path = `${path}/notebook`;
+  } else if (objectId) {
     path = `${path}/${objectId}`;
   }
 
@@ -85,7 +88,7 @@ export function serializedQuestion(card: Card, opts = {}) {
 }
 
 type NewQuestionUrlBuilderParams = QuestionCreatorOpts & {
-  mode?: "view" | "notebook";
+  mode?: "view" | "notebook" | "query";
   creationType?: string;
   objectId?: number | string;
 };
@@ -96,29 +99,43 @@ export function newQuestion({
   objectId,
   ...options
 }: NewQuestionUrlBuilderParams = {}) {
-  const url = Question.create(options).getUrl({
+  const question = Question.create(options);
+  const url = ML_Urls.getUrl(question, {
     creationType,
     query: objectId ? { objectId } : undefined,
   });
+
+  const type = question.type();
+
   if (mode) {
-    return url.replace(/^\/question/, `/question\/${mode}`);
-  } else {
-    return url;
+    return url.replace(/^\/(question|model)/, `/${type}\/${mode}`);
   }
+
+  return url;
 }
 
-export function dataset(...args: Parameters<typeof question>) {
-  return question(...args);
-}
-
-export function publicQuestion(uuid: string, type: string | null = null) {
-  const siteUrl = MetabaseSettings.get("site-url");
-  return `${siteUrl}/public/question/${uuid}` + (type ? `.${type}` : ``);
+export function publicQuestion({
+  uuid,
+  type = null,
+  query,
+  includeSiteUrl = true,
+}: {
+  uuid: string;
+  type?: string | null;
+  query?: string;
+  includeSiteUrl?: boolean;
+}) {
+  const siteUrl = includeSiteUrl ? MetabaseSettings.get("site-url") : "";
+  const searchQuery = query ? `?${query}` : "";
+  return (
+    `${siteUrl}/public/question/${uuid}` +
+    (type ? `.${type}` : "") +
+    searchQuery
+  );
 }
 
 export function embedCard(token: string, type: string | null = null) {
-  const siteUrl = MetabaseSettings.get("site-url");
-  return `${siteUrl}/embed/question/${token}` + (type ? `.${type}` : ``);
+  return `/embed/question/${token}` + (type ? `.${type}` : ``);
 }
 
 export function tableRowsQuery(
@@ -141,4 +158,8 @@ export function tableRowsQuery(
   // The QB will parse the querystring and use DB and table IDs to create an ad-hoc question
   // We should refactor the initializeQB to avoid passing query string to hash as it's pretty confusing
   return question(null, { hash: query });
+}
+
+export function xrayModel(id: CardId) {
+  return `/auto/dashboard/model/${id}`;
 }

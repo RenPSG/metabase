@@ -1,5 +1,4 @@
 /* eslint-disable react/prop-types */
-import React from "react";
 import PropTypes from "prop-types";
 
 import ItemPicker from "./ItemPicker";
@@ -21,5 +20,7 @@ QuestionPicker.propTypes = {
   // callback that takes a question ID
   onChange: PropTypes.func.isRequired,
 };
-
+/**
+ * @deprecated use metabase/common/components QuestionPicker instead
+ */
 export default QuestionPicker;

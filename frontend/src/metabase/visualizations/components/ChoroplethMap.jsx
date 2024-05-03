@@ -1,27 +1,30 @@
 /* eslint-disable react/prop-types */
-import React, { Component } from "react";
+import cx from "classnames";
+import Color from "color";
+import d3 from "d3";
+import { Component } from "react";
+import ss from "simple-statistics";
 import { t } from "ttag";
+import _ from "underscore";
+
 import LoadingSpinner from "metabase/components/LoadingSpinner";
-
-import { isMetric, isString } from "metabase/lib/schema_metadata";
-import { MinColumnsError } from "metabase/visualizations/lib/errors";
-import MetabaseSettings from "metabase/lib/settings";
-
+import CS from "metabase/css/core/index.css";
 import { formatValue } from "metabase/lib/formatting";
-
-import ChartWithLegend from "./ChartWithLegend";
-import LegacyChoropleth from "./LegacyChoropleth";
-import LeafletChoropleth from "./LeafletChoropleth";
-
+import MetabaseSettings from "metabase/lib/settings";
+import { MinColumnsError } from "metabase/visualizations/lib/errors";
 import {
   computeMinimalBounds,
   getCanonicalRowKey,
 } from "metabase/visualizations/lib/mapping";
+import {
+  getDefaultSize,
+  getMinSize,
+} from "metabase/visualizations/shared/utils/sizes";
+import { isMetric, isString } from "metabase-lib/v1/types/utils/isa";
 
-import d3 from "d3";
-import ss from "simple-statistics";
-import _ from "underscore";
-import Color from "color";
+import ChartWithLegend from "./ChartWithLegend";
+import LeafletChoropleth from "./LeafletChoropleth";
+import LegacyChoropleth from "./LegacyChoropleth";
 
 // TODO COLOR
 const HEAT_MAP_COLORS = ["#C4E4FF", "#81C5FF", "#51AEFF", "#1E96FF", "#0061B5"];
@@ -31,13 +34,9 @@ export function getColorplethColorScale(
   color,
   { lightness = 92, darken = 0.2, darkenLast = 0.3, saturate = 0.1 } = {},
 ) {
-  const lightColor = Color(color)
-    .lightness(lightness)
-    .saturate(saturate);
+  const lightColor = Color(color).lightness(lightness).saturate(saturate);
 
-  const darkColor = Color(color)
-    .darken(darken)
-    .saturate(saturate);
+  const darkColor = Color(color).darken(darken).saturate(saturate);
 
   const scale = d3.scale
     .linear()
@@ -57,6 +56,7 @@ export function getColorplethColorScale(
 }
 
 const geoJsonCache = new Map();
+
 function loadGeoJson(geoJsonPath, callback) {
   if (geoJsonCache.has(geoJsonPath)) {
     setTimeout(() => callback(geoJsonCache.get(geoJsonPath)), 0);
@@ -87,6 +87,7 @@ export function getLegendTitles(groups, columnSettings) {
 
 // if the average formatted length is greater than this, we switch to compact formatting
 const AVERAGE_LENGTH_CUTOFF = 5;
+
 function shouldUseCompactFormatting(groups, formatMetric) {
   const minValues = groups.map(([x]) => x);
   const maxValues = groups.slice(0, -1).map(group => group[group.length - 1]);
@@ -101,7 +102,8 @@ function shouldUseCompactFormatting(groups, formatMetric) {
 export default class ChoroplethMap extends Component {
   static propTypes = {};
 
-  static minSize = { width: 4, height: 4 };
+  static minSize = getMinSize("map");
+  static defaultSize = getDefaultSize("map");
 
   static isSensible({ cols }) {
     return cols.filter(isString).length > 0 && cols.filter(isMetric).length > 0;
@@ -153,7 +155,7 @@ export default class ChoroplethMap extends Component {
           this.setState({
             geoJson: geoJson,
             geoJsonPath: geoJsonPath,
-            minimalBounds: computeMinimalBounds(geoJson.features),
+            minimalBounds: computeMinimalBounds(geoJson?.features ?? []),
           });
         });
       }
@@ -202,7 +204,7 @@ export default class ChoroplethMap extends Component {
 
     if (!geoJson) {
       return (
-        <div className={className + " flex layout-centered"}>
+        <div className={cx(className, CS.flex, CS.layoutCentered)}>
           <LoadingSpinner />
         </div>
       );
@@ -279,20 +281,20 @@ export default class ChoroplethMap extends Component {
             settings,
           };
 
-    const isClickable =
-      onVisualizationClick &&
-      visualizationIsClickable(getFeatureClickObject(rows[0]));
+    const isClickable = onVisualizationClick != null;
 
     const onClickFeature =
       isClickable &&
       (click => {
-        const featureKey = getFeatureKey(click.feature);
-        const row = rowByFeatureKey.get(featureKey);
-        if (onVisualizationClick) {
-          onVisualizationClick({
-            ...getFeatureClickObject(row, click.feature),
-            event: click.event,
-          });
+        if (visualizationIsClickable(getFeatureClickObject(rows[0]))) {
+          const featureKey = getFeatureKey(click.feature);
+          const row = rowByFeatureKey.get(featureKey);
+          if (onVisualizationClick) {
+            onVisualizationClick({
+              ...getFeatureClickObject(row, click.feature),
+              event: click.event,
+            });
+          }
         }
       });
     const onHoverFeature =

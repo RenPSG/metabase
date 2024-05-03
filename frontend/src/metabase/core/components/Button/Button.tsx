@@ -1,9 +1,16 @@
-import cx from "classnames";
-import React, { ButtonHTMLAttributes, forwardRef, ReactNode, Ref } from "react";
 import styled from "@emotion/styled";
-import { color, space } from "styled-system";
+import cx from "classnames";
+import type { ButtonHTMLAttributes, ReactNode, ElementType, Ref } from "react";
+import { forwardRef } from "react";
 import _ from "underscore";
-import Icon from "metabase/components/Icon";
+
+import ButtonsS from "metabase/css/components/buttons.module.css";
+import CS from "metabase/css/core/index.css";
+import SpacingS from "metabase/css/core/spacing.module.css";
+import { isNotNull } from "metabase/lib/types";
+import type { IconName } from "metabase/ui";
+import { Icon } from "metabase/ui";
+
 import {
   ButtonContent,
   ButtonRoot,
@@ -20,22 +27,43 @@ const BUTTON_VARIANTS = [
   "warning",
   "cancel",
   "success",
-  "purple",
   "white",
   "borderless",
   "onlyIcon",
   "fullWidth",
 ] as const;
 
-interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
-  className?: string;
+const VARIANT_TO_CLASS_MAP: {
+  [key: string]: string;
+} = {
+  small: ButtonsS.ButtonSmall,
+  medium: ButtonsS.ButtonMedium,
+  large: ButtonsS.ButtonLarge,
+  round: ButtonsS.ButtonRound,
+  primary: ButtonsS.ButtonPrimary,
+  danger: ButtonsS.ButtonDanger,
+  warning: ButtonsS.ButtonWarning,
+  cancel: ButtonsS.ButtonCancel,
+  success: ButtonsS.ButtonSuccess,
+  white: ButtonsS.ButtonWhite,
+  borderless: ButtonsS.ButtonBorderless,
+  onlyIcon: ButtonsS.ButtonOnlyIcon,
+  fullWidth: ButtonsS.ButtonFullWidth,
+};
 
-  icon?: string;
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  as?: ElementType;
+  className?: string;
+  to?: string;
+  tooltip?: string; // available when using as={Link}
+  href?: string;
+
+  icon?: IconName | ReactNode;
   iconSize?: number;
   iconColor?: string;
-  iconRight?: string;
+  iconRight?: IconName;
   iconVertical?: boolean;
-  labelBreakpoint?: string;
+  labelBreakpoint?: "sm";
   children?: ReactNode;
 
   small?: boolean;
@@ -55,10 +83,13 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
   borderless?: boolean;
   onlyIcon?: boolean;
   fullWidth?: boolean;
+  onlyText?: boolean;
+  light?: boolean;
 }
 
 const BaseButton = forwardRef(function BaseButton(
   {
+    as,
     className,
     icon,
     iconRight,
@@ -68,33 +99,41 @@ const BaseButton = forwardRef(function BaseButton(
     labelBreakpoint,
     children,
     ...props
-  }: Props,
+  }: ButtonProps,
   ref: Ref<HTMLButtonElement>,
 ) {
-  const variantClasses = BUTTON_VARIANTS.filter(variant => props[variant]).map(
-    variant => "Button--" + variant,
-  );
+  const variantClasses = BUTTON_VARIANTS.filter(variant => props[variant])
+    .map(variant => VARIANT_TO_CLASS_MAP[variant])
+    .filter(isNotNull);
 
   return (
     <ButtonRoot
-      {..._.omit(props, ...BUTTON_VARIANTS)}
-      className={cx("Button", className, variantClasses, {
-        p1: !children,
-      })}
       ref={ref}
+      as={as}
+      {..._.omit(props, ...BUTTON_VARIANTS)}
+      className={cx(ButtonsS.Button, className, variantClasses, {
+        [SpacingS.p1]: !children,
+      })}
+      purple={props.purple}
     >
       <ButtonContent iconVertical={iconVertical}>
-        {icon && (
-          <Icon color={iconColor} name={icon} size={iconSize ? iconSize : 14} />
+        {icon && typeof icon === "string" ? (
+          <Icon
+            color={iconColor}
+            name={icon as unknown as IconName}
+            size={iconSize ? iconSize : 16}
+          />
+        ) : (
+          icon
         )}
         {children && (
           <ButtonTextContainer
             hasIcon={!!icon}
             hasRightIcon={!!iconRight}
             iconVertical={iconVertical}
-            className={cx({
-              [`hide ${labelBreakpoint}-show`]: !!labelBreakpoint,
-            })}
+            className={
+              labelBreakpoint === "sm" ? cx(CS.hide, CS.smShow) : undefined
+            }
           >
             {children}
           </ButtonTextContainer>
@@ -103,7 +142,7 @@ const BaseButton = forwardRef(function BaseButton(
           <Icon
             color={iconColor}
             name={iconRight}
-            size={iconSize ? iconSize : 14}
+            size={iconSize ? iconSize : 16}
           />
         )}
       </ButtonContent>
@@ -111,15 +150,18 @@ const BaseButton = forwardRef(function BaseButton(
   );
 });
 
-const Button = styled(BaseButton)`
-  ${color};
-  ${space};
-`;
+const StyledButton = styled(BaseButton)``;
 
-Button.displayName = "Button";
+StyledButton.displayName = "Button";
 
-export default Object.assign(Button, {
+/**
+ * @deprecated: use Button from "metabase/ui"
+ */
+const Button = Object.assign(StyledButton, {
   Root: ButtonRoot,
   Content: ButtonContent,
   TextContainer: ButtonTextContainer,
 });
+
+// eslint-disable-next-line import/no-default-export -- deprecated usage
+export default Button;

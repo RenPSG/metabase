@@ -1,7 +1,8 @@
 (ns metabase.test.util.i18n
-  (:require [clojure.test :as t]
-            [metabase.util.i18n :as i18n]
-            [metabase.util.i18n.impl :as i18n.impl]))
+  (:require
+   [clojure.test :as t]
+   [metabase.util.i18n :as i18n]
+   [metabase.util.i18n.impl :as i18n.impl]))
 
 (defn do-with-mock-i18n-bundles [bundles thunk]
   (t/testing (format "\nwith mock i18n bundles %s\n" (pr-str bundles))
@@ -13,8 +14,10 @@
 (defmacro with-mock-i18n-bundles
   "Mock the i18n resource bundles for the duration of `body`.
 
-    (with-mock-i18n-bundles {\"es\"    {\"Your database has been added!\" \"¡Tu base de datos ha sido añadida!\"}
-                             \"es-MX\" {\"I''m good thanks\" \"Está bien, gracias\"}}
+    (with-mock-i18n-bundles {\"es\"    {:messages {\"Your database has been added!\"
+                                                   [\"¡Tu base de datos ha sido añadida!\"]}}
+                             \"es-MX\" {:messages {\"I''m good thanks\"
+                                                   [\"Está bien, gracias\"]}}}
       (translate \"es-MX\" \"Your database has been added!\"))
     ;; -> \"¡Tu base de datos ha sido añadida!\""
   [bundles & body]

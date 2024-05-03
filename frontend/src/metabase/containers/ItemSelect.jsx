@@ -1,17 +1,26 @@
 /* eslint-disable react/prop-types */
-import React from "react";
-import ReactDOM from "react-dom";
+import cx from "classnames";
 import PropTypes from "prop-types";
-
+import { Component } from "react";
+import ReactDOM from "react-dom";
 import { t } from "ttag";
 
 import PopoverWithTrigger from "metabase/components/PopoverWithTrigger";
 import SelectButton from "metabase/core/components/SelectButton";
+import CS from "metabase/css/core/index.css";
 
 const MIN_POPOVER_WIDTH = 300;
 
+const typeNameMap = {
+  card: () => t`question`,
+  dataset: () => t`model`,
+  table: () => t`table`,
+  dashboard: () => t`dashboard`,
+  page: () => t`page`,
+};
+
 export default (PickerComponent, NameComponent, type) =>
-  class ItemSelect extends React.Component {
+  class ItemSelect extends Component {
     state = {
       width: MIN_POPOVER_WIDTH,
     };
@@ -28,7 +37,7 @@ export default (PickerComponent, NameComponent, type) =>
     };
 
     static defaultProps = {
-      placeholder: t`Select a ${type}`,
+      placeholder: t`Select a ${typeNameMap[type]?.() ?? type}`,
       inheritWidth: true,
     };
 
@@ -78,7 +87,7 @@ export default (PickerComponent, NameComponent, type) =>
                   ? { width: Math.max(this.state.width, MIN_POPOVER_WIDTH) }
                   : { minWidth: MIN_POPOVER_WIDTH }
               }
-              className="p2 overflow-auto"
+              className={cx(CS.p2, CS.overflowAuto)}
               value={value}
               onChange={itemId => {
                 onChange(itemId);

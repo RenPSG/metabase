@@ -4,19 +4,22 @@
 
   TODO -- since this is no longer strictly a 'util' namespace (most `:sql-jdbc` drivers need to implement one or
   methods from here) let's rename this `metabase.driver.sql.unprepare` when we get a chance."
-  (:require [clojure.string :as str]
-            [clojure.tools.logging :as log]
-            [java-time :as t]
-            [metabase.driver :as driver]
-            [metabase.driver.sql.util :as sql.u]
-            [metabase.util :as u]
-            [metabase.util.i18n :refer [trs]])
-  (:import [java.time Instant LocalDate LocalDateTime LocalTime OffsetDateTime OffsetTime ZonedDateTime]))
+  (:require
+   [clojure.string :as str]
+   [java-time.api :as t]
+   [metabase.driver :as driver]
+   [metabase.driver.sql.util :as sql.u]
+   [metabase.util :as u]
+   [metabase.util.log :as log])
+  (:import
+   (java.time Instant LocalDate LocalDateTime LocalTime OffsetDateTime OffsetTime ZonedDateTime)))
+
+(set! *warn-on-reflection* true)
 
 (defmulti unprepare-value
   "Convert a single argument to appropriate raw SQL for splicing directly into a SQL query. Dispatches on both driver
   and the class of `value`."
-  {:arglists '(^String [driver value])}
+  {:added "0.32.0" :arglists '(^String [driver value])}
   (fn [driver value]
     [(driver/the-initialized-driver driver) (class value)])
   :hierarchy #'driver/hierarchy)
@@ -25,7 +28,7 @@
   [_ value]
   ;; it's better return a slightly broken SQL query with a probably incorrect string representation of the value than
   ;; to have the entire QP run fail because of an unknown type.
-  (log/warn (trs "Don''t know how to unprepare values of class {0}" (.getName (class value))))
+  (log/warnf "Don't know how to unprepare values of class %s" (.getName (class value)))
   (str value))
 
 (defmethod unprepare-value [:sql nil]
@@ -82,7 +85,7 @@
 
   Drivers likely do not need to implement this method themselves -- instead, you should only need to provide
   implementations of `unprepare-value` for the cases where it is needed."
-  {:arglists '([driver [sql & args]]), :style/indent 1}
+  {:added "0.32.0", :arglists '([driver [sql & args]]), :style/indent 1}
   driver/dispatch-on-initialized-driver
   :hierarchy #'driver/hierarchy)
 

@@ -1,11 +1,16 @@
-import React from "react";
-import moment from "moment";
-import _ from "underscore";
 import cx from "classnames";
+import moment from "moment-timezone"; // eslint-disable-line no-restricted-imports -- deprecated usage
+import { Component } from "react";
+import _ from "underscore";
 
 import YearPicker from "metabase/components/YearPicker";
+import CS from "metabase/css/core/index.css";
 
-import { MonthContainer, MonthList } from "./DateMonthYearWidget.styled";
+import {
+  MonthContainer,
+  MonthList,
+  MonthRoot,
+} from "./DateMonthYearWidget.styled";
 
 type Props = {
   value: string;
@@ -18,7 +23,7 @@ type State = {
   year: number;
 };
 
-class DateMonthYearWidget extends React.Component<Props, State> {
+export class DateMonthYearWidget extends Component<Props, State> {
   state: State = {
     month: null,
     year: moment().year(),
@@ -41,18 +46,10 @@ class DateMonthYearWidget extends React.Component<Props, State> {
     }
   }
 
-  static format = (value: string) => {
-    const m = moment(value, "YYYY-MM");
-    return m.isValid() ? m.format("MMMM, YYYY") : "";
-  };
-
   componentWillUnmount() {
     const { month, year } = this.state;
     if (month != null && year != null) {
-      const value = moment()
-        .year(year)
-        .month(month)
-        .format("YYYY-MM");
+      const value = moment().year(year).month(month).format("YYYY-MM");
       if (this.props.value !== value) {
         this.props.setValue(value);
       }
@@ -64,7 +61,7 @@ class DateMonthYearWidget extends React.Component<Props, State> {
     const { month, year } = this.state;
     return (
       <div style={{ maxWidth: 320 }}>
-        <div className="border-bottom flex justify-center py1">
+        <div className={cx(CS.borderBottom, CS.flex, CS.justifyCenter, CS.py1)}>
           <YearPicker
             value={year}
             onChange={year => this.setState({ year: year })}
@@ -93,21 +90,7 @@ interface MonthProp {
 }
 
 const Month = ({ month, selected, onClick }: MonthProp) => (
-  <div
-    aria-selected={selected}
-    className={cx(
-      "cursor-pointer text-bold full text-centered py1 px2 circular my1",
-      {
-        "bg-light-hover": !selected,
-        "text-white bg-brand": selected,
-      },
-    )}
-    onClick={onClick}
-  >
-    {moment()
-      .month(month)
-      .format("MMMM")}
-  </div>
+  <MonthRoot isSelected={selected} aria-selected={selected} onClick={onClick}>
+    {moment().month(month).format("MMMM")}
+  </MonthRoot>
 );
-
-export default DateMonthYearWidget;

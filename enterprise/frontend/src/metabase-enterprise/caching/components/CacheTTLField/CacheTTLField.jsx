@@ -1,7 +1,8 @@
-import React from "react";
 import PropTypes from "prop-types";
 import { t } from "ttag";
+
 import { formDomOnlyProps } from "metabase/lib/redux";
+
 import {
   CacheTTLFieldContainer,
   FieldText,
@@ -17,7 +18,7 @@ const propTypes = {
   message: PropTypes.string,
 };
 
-export function CacheTTLField({ field, message, ...props }) {
+function CacheTTLField({ field, message, ...props }) {
   const hasError = !!field.error;
   return (
     <CacheTTLFieldContainer {...props} data-testid="cache-ttl-field">
@@ -40,3 +41,5 @@ export function CacheTTLField({ field, message, ...props }) {
 }
 
 CacheTTLField.propTypes = propTypes;
+
+export default CacheTTLField;

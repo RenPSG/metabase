@@ -1,7 +1,10 @@
-import Metadata from "metabase-lib/lib/metadata/Metadata";
-import { Group } from "metabase-types/api";
-import _ from "underscore";
+import { isNotFalsy } from "metabase/lib/types";
+import type Metadata from "metabase-lib/v1/metadata/Metadata";
+import type Schema from "metabase-lib/v1/metadata/Schema";
+import type Table from "metabase-lib/v1/metadata/Table";
+import type { Group } from "metabase-types/api";
 
+import type { DataRouteParams, GroupRouteParams } from "../../types";
 import {
   getSchemaEntityId,
   getDatabaseEntityId,
@@ -11,13 +14,18 @@ import {
   getDatabaseFocusPermissionsUrl,
   getGroupFocusPermissionsUrl,
 } from "../../utils/urls";
-import { DataRouteParams, GroupRouteParams } from "../../types";
+
+export type EditorBreadcrumb = {
+  id?: number | string;
+  text: string;
+  url?: string;
+};
 
 export const getDatabasesEditorBreadcrumbs = (
   params: GroupRouteParams,
   metadata: Metadata,
   group: Group,
-) => {
+): EditorBreadcrumb[] | null => {
   const { groupId, databaseId, schemaName } = params;
 
   if (groupId == null) {
@@ -46,7 +54,7 @@ export const getDatabasesEditorBreadcrumbs = (
     return [groupItem, databaseItem];
   }
 
-  const schema = database.schema(schemaName);
+  const schema = database.schema(schemaName) as Schema;
   const schemaItem = {
     id: schema.name,
     text: schema.name,
@@ -57,7 +65,7 @@ export const getDatabasesEditorBreadcrumbs = (
 export const getGroupsDataEditorBreadcrumbs = (
   params: DataRouteParams,
   metadata: Metadata,
-) => {
+): EditorBreadcrumb[] | null => {
   const { databaseId, schemaName, tableId } = params;
 
   if (databaseId == null) {
@@ -79,7 +87,7 @@ export const getGroupsDataEditorBreadcrumbs = (
     return [databaseItem];
   }
 
-  const schema = database.schema(schemaName);
+  const schema = database.schema(schemaName) as Schema;
   const schemaItem = {
     id: schema.id,
     text: schema.name,
@@ -89,10 +97,10 @@ export const getGroupsDataEditorBreadcrumbs = (
   const hasMultipleSchemas = database.schemasCount() > 1;
 
   if (tableId == null) {
-    return [databaseItem, hasMultipleSchemas && schemaItem].filter(Boolean);
+    return [databaseItem, hasMultipleSchemas && schemaItem].filter(isNotFalsy);
   }
 
-  const table = metadata.table(tableId);
+  const table = metadata.table(tableId) as Table;
 
   const tableItem = {
     id: table.id,
@@ -100,6 +108,6 @@ export const getGroupsDataEditorBreadcrumbs = (
   };
 
   return [databaseItem, hasMultipleSchemas && schemaItem, tableItem].filter(
-    Boolean,
+    isNotFalsy,
   );
 };

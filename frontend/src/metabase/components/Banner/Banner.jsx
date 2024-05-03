@@ -1,6 +1,7 @@
-import React from "react";
 import PropTypes from "prop-types";
+
 import { BannerRoot } from "metabase/components/Banner/Banner.styled";
+import Markdown from "metabase/core/components/Markdown";
 
 const propTypes = {
   className: PropTypes.string,
@@ -8,7 +9,10 @@ const propTypes = {
 };
 
 const Banner = ({ className, children }) => {
-  return <BannerRoot className={className}>{children}</BannerRoot>;
+  const content =
+    typeof children === "string" ? <Markdown>{children}</Markdown> : children;
+
+  return <BannerRoot className={className}>{content}</BannerRoot>;
 };
 
 Banner.propTypes = propTypes;

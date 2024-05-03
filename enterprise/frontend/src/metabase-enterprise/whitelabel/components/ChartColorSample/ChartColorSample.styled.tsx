@@ -1,4 +1,5 @@
 import styled from "@emotion/styled";
+
 import { color } from "metabase/lib/colors";
 
 export const ChartRoot = styled.div`
@@ -31,16 +32,16 @@ export const ChartAxis = styled.div`
 
 export const ChartPlot = styled(ChartLayer)`
   display: flex;
-  gap: 10%;
+  justify-content: space-evenly;
   flex: 1 1 auto;
-  padding: 0 1.5rem;
   align-items: flex-end;
 `;
 
 export const ChartBar = styled.div`
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  flex: 0 1 auto;
+  width: 10%;
 `;
 
 export const ChartBarSection = styled.div`

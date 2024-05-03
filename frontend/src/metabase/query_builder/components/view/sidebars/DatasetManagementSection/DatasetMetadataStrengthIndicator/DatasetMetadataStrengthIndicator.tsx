@@ -1,14 +1,11 @@
-import React from "react";
+import { useRef } from "react";
+import { useHoverDirty } from "react-use";
 import { t } from "ttag";
 
-import Question from "metabase-lib/lib/Question";
-
-import ProgressBar from "metabase/components/ProgressBar";
-import Tooltip from "metabase/components/Tooltip";
-
+import Tooltip from "metabase/core/components/Tooltip";
 import { color } from "metabase/lib/colors";
-import { getDatasetMetadataCompletenessPercentage } from "metabase/lib/data-modeling/metadata";
-import { useHover } from "metabase/hooks/use-hover";
+import type Question from "metabase-lib/v1/Question";
+import { getDatasetMetadataCompletenessPercentage } from "metabase-lib/v1/metadata/utils/models";
 
 import {
   Root,
@@ -22,7 +19,7 @@ function getIndicationColor(percentage: number, isHovered: boolean): string {
     return color("danger");
   }
   if (!isHovered) {
-    return color("bg-medium");
+    return color("text-medium");
   }
   return percentage >= 0.9 ? color("success") : color("warning");
 }
@@ -36,7 +33,7 @@ function getTooltipMessage(percentage: number) {
     percentage <= 0.5 ? t`Most` : percentage >= 0.8 ? t`Some` : t`Many`;
 
   return (
-    <TooltipContent>
+    <TooltipContent data-testid="tooltip-content">
       <TooltipParagraph>
         {t`${columnCountDescription} columns are missing a column type, description, or friendly name.`}
       </TooltipParagraph>
@@ -58,7 +55,8 @@ type Props = {
 const TOOLTIP_DELAY: [number, null] = [700, null];
 
 function DatasetMetadataStrengthIndicator({ dataset, ...props }: Props) {
-  const [hoverRef, isHovered] = useHover<HTMLDivElement>();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const isHovering = useHoverDirty(rootRef);
   const resultMetadata = dataset.getResultMetadata();
 
   if (!Array.isArray(resultMetadata) || resultMetadata.length === 0) {
@@ -66,26 +64,25 @@ function DatasetMetadataStrengthIndicator({ dataset, ...props }: Props) {
   }
 
   const percentage = getDatasetMetadataCompletenessPercentage(resultMetadata);
-  const indicationColor = getIndicationColor(percentage, isHovered);
+  const indicationColor = getIndicationColor(percentage, isHovering);
 
   return (
-    <Root {...props} ref={hoverRef}>
+    <Root {...props} ref={rootRef}>
       <Tooltip
         tooltip={getTooltipMessage(percentage)}
         delay={TOOLTIP_DELAY}
         placement="bottom"
       >
-        <PercentageLabel color={indicationColor}>
+        <PercentageLabel
+          color={indicationColor}
+          data-testid="tooltip-component-wrapper"
+        >
           {formatPercentage(percentage)}
         </PercentageLabel>
-        <ProgressBar
-          percentage={percentage}
-          color={indicationColor}
-          height="8px"
-        />
       </Tooltip>
     </Root>
   );
 }
 
-export default DatasetMetadataStrengthIndicator;
+// eslint-disable-next-line import/no-default-export -- deprecated usage
+export default Object.assign(DatasetMetadataStrengthIndicator, { Root });

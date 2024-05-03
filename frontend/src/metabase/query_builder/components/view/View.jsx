@@ -1,44 +1,32 @@
 /* eslint-disable react/prop-types */
-import React from "react";
-import { Motion, spring } from "react-motion";
-import _ from "underscore";
+import { Component } from "react";
+import { connect } from "react-redux";
 import { t } from "ttag";
+import _ from "underscore";
 
 import ExplicitSize from "metabase/components/ExplicitSize";
-import Popover from "metabase/components/Popover";
-import QueryValidationError from "metabase/query_builder/components/QueryValidationError";
-import { SIDEBAR_SIZES } from "metabase/query_builder/constants";
 import LoadingAndErrorWrapper from "metabase/components/LoadingAndErrorWrapper";
 import Toaster from "metabase/components/Toaster";
+import CS from "metabase/css/core/index.css";
+import QueryBuilderS from "metabase/css/query_builder.module.css";
+import { rememberLastUsedDatabase } from "metabase/query_builder/actions";
+import { SIDEBAR_SIZES } from "metabase/query_builder/constants";
+import { TimeseriesChrome } from "metabase/querying";
+import { Transition } from "metabase/ui";
+import * as Lib from "metabase-lib";
 
-import NativeQuery from "metabase-lib/lib/queries/NativeQuery";
-import StructuredQuery from "metabase-lib/lib/queries/StructuredQuery";
-
-import AggregationPopover from "../AggregationPopover";
-import BreakoutPopover from "../BreakoutPopover";
 import DatasetEditor from "../DatasetEditor";
 import NativeQueryEditor from "../NativeQueryEditor";
-import QueryVisualization from "../QueryVisualization";
-import DataReference from "../dataref/DataReference";
-import TagEditorSidebar from "../template_tags/TagEditorSidebar";
-import SnippetSidebar from "../template_tags/SnippetSidebar";
-import SavedQuestionIntroModal from "../SavedQuestionIntroModal";
 import QueryModals from "../QueryModals";
+import QueryVisualization from "../QueryVisualization";
+import { SavedQuestionIntroModal } from "../SavedQuestionIntroModal";
+import DataReference from "../dataref/DataReference";
+import { SnippetSidebar } from "../template_tags/SnippetSidebar";
+import { TagEditorSidebar } from "../template_tags/TagEditorSidebar";
 
-import ChartSettingsSidebar from "./sidebars/ChartSettingsSidebar";
-import ChartTypeSidebar from "./sidebars/ChartTypeSidebar";
-import SummarizeSidebar from "./sidebars/SummarizeSidebar/SummarizeSidebar";
-import FilterSidebar from "./sidebars/FilterSidebar";
-import QuestionDetailsSidebar from "./sidebars/QuestionDetailsSidebar";
-import TimelineSidebar from "./sidebars/TimelineSidebar";
-
-import { ViewSubHeader } from "./ViewHeader";
 import NewQuestionHeader from "./NewQuestionHeader";
-import ViewFooter from "./ViewFooter";
-import ViewSidebar from "./ViewSidebar";
 import NewQuestionView from "./View/NewQuestionView";
-import QueryViewNotebook from "./View/QueryViewNotebook";
-
+import { NotebookContainer } from "./View/NotebookContainer";
 import {
   BorderedViewTitleHeader,
   NativeQueryEditorContainer,
@@ -49,88 +37,27 @@ import {
   StyledDebouncedFrame,
   StyledSyncedParametersList,
 } from "./View.styled";
+import ViewFooter from "./ViewFooter";
+import ViewSidebar from "./ViewSidebar";
+import ChartSettingsSidebar from "./sidebars/ChartSettingsSidebar";
+import ChartTypeSidebar from "./sidebars/ChartTypeSidebar";
+import { QuestionInfoSidebar } from "./sidebars/QuestionInfoSidebar";
+import { SummarizeSidebar } from "./sidebars/SummarizeSidebar";
+import TimelineSidebar from "./sidebars/TimelineSidebar";
 
-const DEFAULT_POPOVER_STATE = {
-  aggregationIndex: null,
-  aggregationPopoverTarget: null,
-  breakoutIndex: null,
-  breakoutPopoverTarget: null,
+const fadeIn = {
+  in: { opacity: 1 },
+  out: { opacity: 0 },
+  transitionProperty: "opacity",
 };
 
-class View extends React.Component {
-  state = {
-    ...DEFAULT_POPOVER_STATE,
-  };
-
-  handleAddSeries = e => {
-    this.setState({
-      ...DEFAULT_POPOVER_STATE,
-      aggregationPopoverTarget: e.target,
-    });
-  };
-
-  handleEditSeries = (e, index) => {
-    this.setState({
-      ...DEFAULT_POPOVER_STATE,
-      aggregationPopoverTarget: e.target,
-      aggregationIndex: index,
-    });
-  };
-
-  handleRemoveSeries = (e, index) => {
-    const { query } = this.props;
-    query.removeAggregation(index).update(null, { run: true });
-  };
-
-  handleEditBreakout = (e, index) => {
-    this.setState({
-      ...DEFAULT_POPOVER_STATE,
-      breakoutPopoverTarget: e.target,
-      breakoutIndex: index,
-    });
-  };
-
-  handleClosePopover = () => {
-    this.setState({
-      ...DEFAULT_POPOVER_STATE,
-    });
-  };
-
-  onChangeAggregation = aggregation => {
-    const { query } = this.props;
-    const { aggregationIndex } = this.state;
-    if (aggregationIndex != null) {
-      query
-        .updateAggregation(aggregationIndex, aggregation)
-        .update(null, { run: true });
-    } else {
-      query.aggregate(aggregation).update(null, { run: true });
-    }
-    this.handleClosePopover();
-  };
-
-  onChangeBreakout = breakout => {
-    const { query } = this.props;
-    const { breakoutIndex } = this.state;
-    if (breakoutIndex != null) {
-      query.updateBreakout(breakoutIndex, breakout).update(null, { run: true });
-    } else {
-      query.breakout(breakout).update(null, { run: true });
-    }
-    this.handleClosePopover();
-  };
-
+class View extends Component {
   getLeftSidebar = () => {
     const {
-      question,
       isShowingChartSettingsSidebar,
       isShowingChartTypeSidebar,
-      isShowingQuestionDetailsSidebar,
-      onOpenModal,
       onCloseChartSettings,
       onCloseChartType,
-      isBookmarked,
-      toggleBookmark,
     } = this.props;
 
     if (isShowingChartSettingsSidebar) {
@@ -143,17 +70,6 @@ class View extends React.Component {
       return <ChartTypeSidebar {...this.props} onClose={onCloseChartType} />;
     }
 
-    if (isShowingQuestionDetailsSidebar) {
-      return (
-        <QuestionDetailsSidebar
-          question={question}
-          onOpenModal={onOpenModal}
-          isBookmarked={isBookmarked}
-          toggleBookmark={toggleBookmark}
-        />
-      );
-    }
-
     return null;
   };
 
@@ -161,37 +77,38 @@ class View extends React.Component {
     const {
       question,
       timelines,
-      isResultDirty,
       isShowingSummarySidebar,
-      isShowingFilterSidebar,
       isShowingTimelineSidebar,
-      runQuestionQuery,
-      visibleTimelineIds,
+      isShowingQuestionInfoSidebar,
+      updateQuestion,
+      visibleTimelineEventIds,
       selectedTimelineEventIds,
       xDomain,
-      showTimelines,
-      hideTimelines,
+      showTimelineEvents,
+      hideTimelineEvents,
       selectTimelineEvents,
       deselectTimelineEvents,
       onOpenModal,
       onCloseSummary,
-      onCloseFilter,
       onCloseTimelines,
+      onSave,
     } = this.props;
 
+    const isSaved = question.isSaved();
+
     if (isShowingSummarySidebar) {
+      const query = question.query();
       return (
         <SummarizeSidebar
-          question={question}
+          query={query}
+          onQueryChange={nextQuery => {
+            const datesetQuery = Lib.toLegacyQuery(nextQuery);
+            const nextQuestion = question.setDatasetQuery(datesetQuery);
+            updateQuestion(nextQuestion.setDefaultDisplay(), { run: true });
+          }}
           onClose={onCloseSummary}
-          isResultDirty={isResultDirty}
-          runQuestionQuery={runQuestionQuery}
         />
       );
-    }
-
-    if (isShowingFilterSidebar) {
-      return <FilterSidebar question={question} onClose={onCloseFilter} />;
     }
 
     if (isShowingTimelineSidebar) {
@@ -199,17 +116,21 @@ class View extends React.Component {
         <TimelineSidebar
           question={question}
           timelines={timelines}
-          visibleTimelineIds={visibleTimelineIds}
+          visibleTimelineEventIds={visibleTimelineEventIds}
           selectedTimelineEventIds={selectedTimelineEventIds}
           xDomain={xDomain}
-          onShowTimelines={showTimelines}
-          onHideTimelines={hideTimelines}
+          onShowTimelineEvents={showTimelineEvents}
+          onHideTimelineEvents={hideTimelineEvents}
           onSelectTimelineEvents={selectTimelineEvents}
           onDeselectTimelineEvents={deselectTimelineEvents}
           onOpenModal={onOpenModal}
           onClose={onCloseTimelines}
         />
       );
+    }
+
+    if (isSaved && isShowingQuestionInfoSidebar) {
+      return <QuestionInfoSidebar question={question} onSave={onSave} />;
     }
 
     return null;
@@ -221,19 +142,27 @@ class View extends React.Component {
       isShowingDataReference,
       isShowingSnippetSidebar,
       isShowingTimelineSidebar,
+      isShowingQuestionInfoSidebar,
       toggleTemplateTagsEditor,
       toggleDataReference,
       toggleSnippetSidebar,
-      showTimelines,
-      hideTimelines,
+      showTimelineEvent,
+      showTimelineEvents,
+      hideTimelineEvents,
       selectTimelineEvents,
       deselectTimelineEvents,
       onCloseTimelines,
+      onSave,
+      question,
     } = this.props;
 
     if (isShowingTemplateTagsEditor) {
       return (
-        <TagEditorSidebar {...this.props} onClose={toggleTemplateTagsEditor} />
+        <TagEditorSidebar
+          {...this.props}
+          query={question.legacyQuery()}
+          onClose={toggleTemplateTagsEditor}
+        />
       );
     }
 
@@ -249,8 +178,9 @@ class View extends React.Component {
       return (
         <TimelineSidebar
           {...this.props}
-          onShowTimelines={showTimelines}
-          onHideTimelines={hideTimelines}
+          onShowTimelineEvent={showTimelineEvent}
+          onShowTimelineEvents={showTimelineEvents}
+          onHideTimelineEvents={hideTimelineEvents}
           onSelectTimelineEvents={selectTimelineEvents}
           onDeselectTimelineEvents={deselectTimelineEvents}
           onClose={onCloseTimelines}
@@ -258,46 +188,58 @@ class View extends React.Component {
       );
     }
 
+    if (isShowingQuestionInfoSidebar) {
+      return <QuestionInfoSidebar question={question} onSave={onSave} />;
+    }
+
     return null;
   };
 
   getRightSidebar = () => {
     const { question } = this.props;
-    const isStructured = question.isStructured();
-    return isStructured
+    const { isNative } = Lib.queryDisplayInfo(question.query());
+
+    return !isNative
       ? this.getRightSidebarForStructuredQuery()
       : this.getRightSidebarForNativeQuery();
   };
 
   renderHeader = () => {
-    const { query } = this.props;
-    const isStructured = query instanceof StructuredQuery;
+    const { question } = this.props;
+    const query = question.query();
+    const { isNative } = Lib.queryDisplayInfo(query);
 
-    const isNewQuestion =
-      isStructured && !query.sourceTableId() && !query.sourceQuery();
+    const isNewQuestion = !isNative && Lib.sourceTableOrCardId(query) === null;
 
     return (
-      <Motion
-        defaultStyle={isNewQuestion ? { opacity: 0 } : { opacity: 1 }}
-        style={isNewQuestion ? { opacity: spring(0) } : { opacity: spring(1) }}
-      >
-        {({ opacity }) => (
-          <QueryBuilderViewHeaderContainer>
-            <BorderedViewTitleHeader {...this.props} style={{ opacity }} />
-            {opacity < 1 && (
-              <NewQuestionHeader
-                className="spread"
-                style={{ opacity: 1 - opacity }}
-              />
-            )}
-          </QueryBuilderViewHeaderContainer>
-        )}
-      </Motion>
+      <QueryBuilderViewHeaderContainer>
+        <BorderedViewTitleHeader
+          {...this.props}
+          style={{
+            transition: "opacity 300ms linear",
+            opacity: isNewQuestion ? 0 : 1,
+          }}
+        />
+        {/*This is used so that the New Question Header is unmounted after the animation*/}
+        <Transition mounted={isNewQuestion} transition={fadeIn} duration={300}>
+          {style => <NewQuestionHeader className={CS.spread} style={style} />}
+        </Transition>
+      </QueryBuilderViewHeaderContainer>
     );
   };
 
   renderNativeQueryEditor = () => {
-    const { question, query, card, height, isDirty } = this.props;
+    const {
+      question,
+      card,
+      height,
+      isDirty,
+      isNativeEditorOpen,
+      setParameterValueToDefault,
+      onSetDatabaseId,
+    } = this.props;
+
+    const legacyQuery = question.legacyQuery();
 
     // Normally, when users open native models,
     // they open an ad-hoc GUI question using the model as a data source
@@ -306,7 +248,8 @@ class View extends React.Component {
     // So the model is opened as an underlying native question and the query editor becomes visible
     // This check makes it hide the editor in this particular case
     // More details: https://github.com/metabase/metabase/pull/20161
-    if (question.isDataset() && !query.isEditable()) {
+    const { isEditable } = Lib.queryDisplayInfo(question.query());
+    if (question.type() === "model" && !isEditable) {
       return null;
     }
 
@@ -314,9 +257,13 @@ class View extends React.Component {
       <NativeQueryEditorContainer>
         <NativeQueryEditor
           {...this.props}
+          query={legacyQuery}
           viewHeight={height}
-          isOpen={!card.dataset_query.native.query || isDirty}
+          isOpen={legacyQuery.isEmpty() || isDirty}
+          isInitiallyOpen={isNativeEditorOpen}
           datasetQuery={card && card.dataset_query}
+          setParameterValueToDefault={setParameterValueToDefault}
+          onSetDatabaseId={onSetDatabaseId}
         />
       </NativeQueryEditorContainer>
     );
@@ -324,37 +271,28 @@ class View extends React.Component {
 
   renderMain = ({ leftSidebar, rightSidebar }) => {
     const {
-      query,
+      question,
       mode,
       parameters,
       isLiveResizable,
-      isPreviewable,
-      isPreviewing,
       setParameterValue,
-      setIsPreviewing,
+      queryBuilderMode,
     } = this.props;
 
+    if (queryBuilderMode === "notebook") {
+      // we need to render main only in view mode
+      return;
+    }
+
     const queryMode = mode && mode.queryMode();
-    const ModeFooter = queryMode && queryMode.ModeFooter;
-    const isStructured = query instanceof StructuredQuery;
-    const isNative = query instanceof NativeQuery;
-
-    const validationError = _.first(query.validate?.());
-
-    const topQuery = isStructured && query.topLevelQuery();
-
-    // only allow editing of series for structured queries
-    const onAddSeries = topQuery ? this.handleAddSeries : null;
-    const onEditSeries = topQuery ? this.handleEditSeries : null;
-    const onRemoveSeries =
-      topQuery && topQuery.hasAggregations() ? this.handleRemoveSeries : null;
-    const onEditBreakout =
-      topQuery && topQuery.hasBreakouts() ? this.handleEditBreakout : null;
-
+    const { isNative } = Lib.queryDisplayInfo(question.query());
     const isSidebarOpen = leftSidebar || rightSidebar;
 
     return (
-      <QueryBuilderMain isSidebarOpen={isSidebarOpen}>
+      <QueryBuilderMain
+        isSidebarOpen={isSidebarOpen}
+        data-testid="query-builder-main"
+      >
         {isNative ? (
           this.renderNativeQueryEditor()
         ) : (
@@ -365,83 +303,27 @@ class View extends React.Component {
           />
         )}
 
-        <ViewSubHeader
-          isPreviewable={isPreviewable}
-          isPreviewing={isPreviewing}
-          setIsPreviewing={setIsPreviewing}
+        <StyledDebouncedFrame enabled={!isLiveResizable}>
+          <QueryVisualization
+            {...this.props}
+            noHeader
+            className={CS.spread}
+            mode={queryMode}
+          />
+        </StyledDebouncedFrame>
+        <TimeseriesChrome
+          question={this.props.question}
+          updateQuestion={this.props.updateQuestion}
+          className={CS.flexNoShrink}
         />
-
-        {validationError ? (
-          <QueryValidationError error={validationError} />
-        ) : (
-          <StyledDebouncedFrame enabled={!isLiveResizable}>
-            <QueryVisualization
-              {...this.props}
-              noHeader
-              className="spread"
-              onAddSeries={onAddSeries}
-              onEditSeries={onEditSeries}
-              onRemoveSeries={onRemoveSeries}
-              onEditBreakout={onEditBreakout}
-              mode={queryMode}
-            />
-          </StyledDebouncedFrame>
-        )}
-
-        {ModeFooter && (
-          <ModeFooter {...this.props} className="flex-no-shrink" />
-        )}
-
-        <ViewFooter {...this.props} className="flex-no-shrink" />
+        <ViewFooter {...this.props} className={CS.flexNoShrink} />
       </QueryBuilderMain>
-    );
-  };
-
-  renderAggregationPopover = () => {
-    const { query } = this.props;
-    const { aggregationPopoverTarget, aggregationIndex } = this.state;
-    return (
-      <Popover
-        isOpen={!!aggregationPopoverTarget}
-        target={aggregationPopoverTarget}
-        onClose={this.handleClosePopover}
-      >
-        <AggregationPopover
-          query={query}
-          aggregation={
-            aggregationIndex >= 0 ? query.aggregations()[aggregationIndex] : 0
-          }
-          onChangeAggregation={this.onChangeAggregation}
-          onClose={this.handleClosePopover}
-        />
-      </Popover>
-    );
-  };
-
-  renderBreakoutPopover = () => {
-    const { query } = this.props;
-    const { breakoutPopoverTarget, breakoutIndex } = this.state;
-    return (
-      <Popover
-        isOpen={!!breakoutPopoverTarget}
-        onClose={this.handleClosePopover}
-        target={breakoutPopoverTarget}
-      >
-        <BreakoutPopover
-          query={query}
-          breakout={breakoutIndex >= 0 ? query.breakouts()[breakoutIndex] : 0}
-          onChangeBreakout={this.onChangeBreakout}
-          onClose={this.handleClosePopover}
-        />
-      </Popover>
     );
   };
 
   render() {
     const {
       question,
-      query,
-      card,
       databases,
       isShowingNewbModal,
       isShowingTimelineSidebar,
@@ -451,24 +333,38 @@ class View extends React.Component {
       onConfirmToast,
       isShowingToaster,
       isHeaderVisible,
+      updateQuestion,
     } = this.props;
 
-    // if we don't have a card at all or no databases then we are initializing, so keep it simple
-    if (!card || !databases) {
-      return <LoadingAndErrorWrapper className="full-height" loading />;
+    // if we don't have a question at all or no databases then we are initializing, so keep it simple
+    if (!question || !databases) {
+      return <LoadingAndErrorWrapper className={CS.fullHeight} loading />;
     }
 
-    const isStructured = query instanceof StructuredQuery;
+    const query = question.query();
+    const { isNative } = Lib.queryDisplayInfo(question.query());
 
-    const isNewQuestion =
-      isStructured && !query.sourceTableId() && !query.sourceQuery();
+    const isNewQuestion = !isNative && Lib.sourceTableOrCardId(query) === null;
 
     if (isNewQuestion && queryBuilderMode === "view") {
-      return <NewQuestionView query={query} className="full-height" />;
+      return (
+        <NewQuestionView
+          question={question}
+          updateQuestion={updateQuestion}
+          className={CS.fullHeight}
+        />
+      );
     }
 
-    if (card.dataset && queryBuilderMode === "dataset") {
-      return <DatasetEditor {...this.props} />;
+    const isModel = question.type() === "model";
+
+    if (isModel && queryBuilderMode === "dataset") {
+      return (
+        <>
+          <DatasetEditor {...this.props} />
+          <QueryModals {...this.props} />
+        </>
+      );
     }
 
     const isNotebookContainerOpen =
@@ -481,13 +377,16 @@ class View extends React.Component {
       : SIDEBAR_SIZES.NORMAL;
 
     return (
-      <div className="full-height">
-        <QueryBuilderViewRoot className="QueryBuilder">
+      <div className={CS.fullHeight}>
+        <QueryBuilderViewRoot
+          className={QueryBuilderS.QueryBuilder}
+          data-testid="query-builder-root"
+        >
           {isHeaderVisible && this.renderHeader()}
           <QueryBuilderContentContainer>
-            {isStructured && (
-              <QueryViewNotebook
-                isNotebookContainerOpen={isNotebookContainerOpen}
+            {!isNative && (
+              <NotebookContainer
+                isOpen={isNotebookContainerOpen}
                 {...this.props}
               />
             )}
@@ -508,14 +407,13 @@ class View extends React.Component {
         {isShowingNewbModal && (
           <SavedQuestionIntroModal
             question={question}
+            isShowingNewbModal={isShowingNewbModal}
             onClose={() => closeQbNewbModal()}
           />
         )}
 
         <QueryModals {...this.props} />
 
-        {isStructured && this.renderAggregationPopover()}
-        {isStructured && this.renderBreakoutPopover()}
         <Toaster
           message={t`Would you like to be notified when this question is done loading?`}
           isShown={isShowingToaster}
@@ -528,4 +426,11 @@ class View extends React.Component {
   }
 }
 
-export default ExplicitSize({ refreshMode: "debounceLeading" })(View);
+const mapDispatchToProps = dispatch => ({
+  onSetDatabaseId: id => dispatch(rememberLastUsedDatabase(id)),
+});
+
+export default _.compose(
+  ExplicitSize({ refreshMode: "debounceLeading" }),
+  connect(null, mapDispatchToProps),
+)(View);

@@ -1,16 +1,18 @@
 /* eslint-disable react/prop-types */
-import React, { Component } from "react";
-import styles from "./RefreshWidget.css";
+import { createRef, Component } from "react";
+import { t } from "ttag";
 
 import PopoverWithTrigger from "metabase/components/PopoverWithTrigger";
-import Tooltip from "metabase/components/Tooltip";
-import Icon from "metabase/components/Icon";
-import ClockIcon from "metabase/components/icons/ClockIcon";
 import CountdownIcon from "metabase/components/icons/CountdownIcon";
-import { t } from "ttag";
-import cx from "classnames";
+import Tooltip from "metabase/core/components/Tooltip";
+import { DashboardHeaderButton } from "metabase/dashboard/components/DashboardHeader/DashboardHeader.styled";
 
-import { DashboardHeaderButton } from "metabase/dashboard/containers/DashboardHeader.styled";
+import {
+  RefreshOptionIcon,
+  RefreshOptionItem,
+  RefreshWidgetPopover,
+  RefreshWidgetTitle,
+} from "./RefreshWidget.styled";
 
 const OPTIONS = [
   { name: t`Off`, period: null },
@@ -22,11 +24,11 @@ const OPTIONS = [
   { name: t`60 minutes`, period: 60 * 60 },
 ];
 
-export default class RefreshWidget extends Component {
+export class RefreshWidget extends Component {
   constructor(props) {
     super(props);
 
-    this.popover = React.createRef();
+    this.popover = createRef();
   }
   state = { elapsed: null };
 
@@ -48,7 +50,7 @@ export default class RefreshWidget extends Component {
   }
 
   render() {
-    const { period, onChangePeriod, className } = this.props;
+    const { period, onChangePeriod } = this.props;
     const { elapsed } = this.state;
     const remaining = period - elapsed;
     return (
@@ -57,9 +59,10 @@ export default class RefreshWidget extends Component {
         triggerElement={
           elapsed == null ? (
             <Tooltip tooltip={t`Auto-refresh`}>
-              <DashboardHeaderButton>
-                <ClockIcon width={18} height={18} className={className} />
-              </DashboardHeaderButton>
+              <DashboardHeaderButton
+                icon="clock"
+                aria-label={t`Auto Refresh`}
+              />
             </Tooltip>
           ) : (
             <Tooltip
@@ -72,21 +75,23 @@ export default class RefreshWidget extends Component {
                 Math.round(remaining % 60)
               }
             >
-              <DashboardHeaderButton>
-                <CountdownIcon
-                  width={18}
-                  height={18}
-                  className="text-green"
-                  percent={Math.min(0.95, (period - elapsed) / period)}
-                />
-              </DashboardHeaderButton>
+              <DashboardHeaderButton
+                icon={
+                  <CountdownIcon
+                    width={16}
+                    height={16}
+                    percent={Math.min(0.95, (period - elapsed) / period)}
+                  />
+                }
+                aria-label={t`Auto Refresh`}
+              />
             </Tooltip>
           )
         }
         targetOffsetY={10}
       >
-        <div className={styles.popover}>
-          <div className={styles.title}>{t`Auto Refresh`}</div>
+        <RefreshWidgetPopover>
+          <RefreshWidgetTitle>{t`Auto Refresh`}</RefreshWidgetTitle>
           <RefreshOptionList>
             {OPTIONS.map(option => (
               <RefreshOption
@@ -101,7 +106,7 @@ export default class RefreshWidget extends Component {
               />
             ))}
           </RefreshOptionList>
-        </div>
+        </RefreshWidgetPopover>
       </PopoverWithTrigger>
     );
   }
@@ -110,14 +115,12 @@ export default class RefreshWidget extends Component {
 const RefreshOptionList = ({ children }) => <ul>{children}</ul>;
 
 const RefreshOption = ({ name, period, selected, onClick }) => (
-  <li
-    className={cx(styles.option, styles[period == null ? "off" : "on"], {
-      [styles.selected]: selected,
-    })}
+  <RefreshOptionItem
+    isEnabled={period != null}
+    isSelected={selected}
     onClick={onClick}
   >
-    <Icon name="check" size={14} />
-    <span className={styles.name}>{name.split(" ")[0]}</span>
-    <span className={styles.nameSuffix}> {name.split(" ")[1]}</span>
-  </li>
+    <RefreshOptionIcon name="check" />
+    <span>{name}</span>
+  </RefreshOptionItem>
 );

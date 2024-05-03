@@ -1,34 +1,26 @@
-import React from "react";
 import PropTypes from "prop-types";
-import { connect } from "react-redux";
+import { useState } from "react";
+import { useMount } from "react-use";
 import { t } from "ttag";
-import _ from "underscore";
-
-import { capitalize, inflect } from "metabase/lib/formatting";
-import { dismissUndo, performUndo } from "metabase/redux/undo";
-import { getUndos } from "metabase/selectors/undo";
 
 import BodyComponent from "metabase/components/BodyComponent";
+import { Ellipsified } from "metabase/core/components/Ellipsified";
+import { capitalize, inflect } from "metabase/lib/formatting";
+import { useSelector, useDispatch } from "metabase/lib/redux";
+import { dismissUndo, performUndo } from "metabase/redux/undo";
+import { Transition } from "metabase/ui";
 
 import {
   CardContent,
   CardContentSide,
   CardIcon,
+  ControlsCardContent,
   DefaultText,
   DismissIcon,
   ToastCard,
   UndoButton,
   UndoList,
 } from "./UndoListing.styled";
-
-const mapStateToProps = (state, props) => ({
-  undos: getUndos(state, props),
-});
-
-const mapDispatchToProps = {
-  dismissUndo,
-  performUndo,
-};
 
 DefaultMessage.propTypes = {
   undo: PropTypes.object.isRequired,
@@ -60,47 +52,78 @@ UndoToast.propTypes = {
   onDismiss: PropTypes.func.isRequired,
 };
 
-function UndoToast({ undo, onUndo, onDismiss }) {
-  return (
-    <ToastCard dark data-testid="toast-undo">
-      <CardContent>
-        <CardContentSide>
-          <CardIcon name={undo.icon || "check"} color="white" />
-          {renderMessage(undo)}
-        </CardContentSide>
-        <CardContentSide>
-          {undo.actions?.length > 0 && (
-            <UndoButton onClick={onUndo}>{t`Undo`}</UndoButton>
-          )}
-          <DismissIcon name="close" onClick={onDismiss} />
-        </CardContentSide>
-      </CardContent>
-    </ToastCard>
-  );
-}
-
-UndoListing.propTypes = {
-  undos: PropTypes.array.isRequired,
-  performUndo: PropTypes.func.isRequired,
-  dismissUndo: PropTypes.func.isRequired,
+const slideIn = {
+  in: { opacity: 1, transform: "translateY(0)" },
+  out: { opacity: 0, transform: "translateY(100px)" },
+  common: { transformOrigin: "top" },
+  transitionProperty: "transform, opacity",
 };
 
-function UndoListing({ undos, performUndo, dismissUndo }) {
+function UndoToast({ undo, onUndo, onDismiss }) {
+  const [mounted, setMounted] = useState(false);
+
+  useMount(() => {
+    setMounted(true);
+  });
+
   return (
-    <UndoList>
+    <Transition
+      mounted={mounted}
+      transition={slideIn}
+      duration={300}
+      timingFunction="ease"
+    >
+      {styles => (
+        <ToastCard
+          dark
+          data-testid="toast-undo"
+          color={undo.toastColor}
+          role="status"
+          style={styles}
+        >
+          <CardContent>
+            <CardContentSide maw="75ch">
+              {undo.icon && <CardIcon name={undo.icon} color="white" />}
+              <Ellipsified showTooltip={false}>
+                {renderMessage(undo)}
+              </Ellipsified>
+            </CardContentSide>
+            <ControlsCardContent>
+              {undo.actions?.length > 0 && (
+                <UndoButton role="button" onClick={onUndo}>
+                  {undo.actionLabel ?? t`Undo`}
+                </UndoButton>
+              )}
+              {undo.canDismiss && (
+                <DismissIcon
+                  color={undo.dismissIconColor || "inherit"}
+                  name="close"
+                  onClick={onDismiss}
+                />
+              )}
+            </ControlsCardContent>
+          </CardContent>
+        </ToastCard>
+      )}
+    </Transition>
+  );
+}
+function UndoListingInner() {
+  const dispatch = useDispatch();
+  const undos = useSelector(state => state.undo);
+
+  return (
+    <UndoList data-testid="undo-list" aria-label="undo-list">
       {undos.map(undo => (
         <UndoToast
           key={undo._domId}
           undo={undo}
-          onUndo={() => performUndo(undo.id)}
-          onDismiss={() => dismissUndo(undo.id)}
+          onUndo={() => dispatch(performUndo(undo.id))}
+          onDismiss={() => dispatch(dismissUndo(undo.id))}
         />
       ))}
     </UndoList>
   );
 }
 
-export default _.compose(
-  connect(mapStateToProps, mapDispatchToProps),
-  BodyComponent,
-)(UndoListing);
+export const UndoListing = BodyComponent(UndoListingInner);

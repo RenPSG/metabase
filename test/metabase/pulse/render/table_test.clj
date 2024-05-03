@@ -1,9 +1,15 @@
 (ns metabase.pulse.render.table-test
-  (:require [clojure.test :refer :all]
-            [metabase.pulse.render.color :as color]
-            [metabase.pulse.render.table :as table]
-            [metabase.pulse.render.test-util :as render.tu]
-            [metabase.test.util :as tu]))
+  (:require
+   [clojure.test :refer :all]
+   [metabase.formatter :as formatter]
+   [metabase.pulse.render :as render]
+   [metabase.pulse.render.color :as color]
+   [metabase.pulse.render.table :as table]
+   [metabase.pulse.render.test-util :as render.tu]
+   [metabase.test :as mt]
+   [metabase.test.fixtures :as fixtures]))
+
+(use-fixtures :once (fixtures/initialize :db))
 
 (defn- query-results->header+rows
   "Makes pulse header and data rows with no bar-width. Including bar-width just adds extra HTML that will be ignored."
@@ -17,7 +23,7 @@
   results."
   [pred collect-fn form]
   (let [results (atom [])]
-    (tu/postwalk-pred pred
+    (mt/postwalk-pred pred
                       (fn [node]
                         (when-let [result (collect-fn node)]
                           (swap! results conj result))
@@ -58,17 +64,200 @@
   (let [query-results {:cols [{:name "a"} {:name "b"} {:name "c"}]
                        :rows [[1 2 3]
                               [4 5 6]
-                              [7 8 9]]}]
-    (is (= {"1" nil
-            "2" nil
-            "3" "rgba(0, 255, 0, 0.75)"
-            "4" nil
-            "5" nil
-            "6" "rgba(0, 128, 128, 0.75)"
-            "7" "rgba(255, 0, 0, 0.65)"
-            "8" "rgba(255, 0, 0, 0.2)"
-            "9" "rgba(0, 0, 255, 0.75)"}
+                              [7 8 9]
+                              [7 8 (formatter/map->NumericWrapper {:num-str "4.5" :num-value 4.5})]
+                              [7 8 (formatter/map->NumericWrapper {:num-str "1,001.5" :num-value 1001.5})]    ;; default floating point seperator .
+                              [7 8 (formatter/map->NumericWrapper {:num-str "1.001,5" :num-value 1001.5})]]}] ;; floating point seperator is ,
+    (is (= {"1"       nil
+            "2"       nil
+            "3"       "rgba(0, 255, 0, 0.75)"
+            "4"       nil
+            "4.5"     "rgba(0, 191, 64, 0.75)"
+            "5"       nil
+            "6"       "rgba(0, 128, 128, 0.75)"
+            "7"       "rgba(255, 0, 0, 0.65)"
+            "8"       "rgba(255, 0, 0, 0.2)"
+            "9"       "rgba(0, 0, 255, 0.75)"
+            "1.001,5" "rgba(0, 0, 255, 0.75)"
+            "1,001.5" "rgba(0, 0, 255, 0.75)"}
            (-> (color/make-color-selector query-results (:visualization_settings render.tu/test-card))
                (#'table/render-table 0 ["a" "b" "c"] (query-results->header+rows query-results))
                find-table-body
                cell-value->background-color)))))
+
+(deftest header-truncation-test []
+  (let [[normal-heading long-heading :as row] ["Count" (apply str (repeat 120 "A"))]
+        [normal-rendered long-rendered]       (->> (#'table/render-table-head {:row row})
+                                               (tree-seq vector? rest)
+                                               (filter #(= :th (first %)))
+                                               (map last))]
+    (testing "Table Headers are truncated if they are really long."
+      (is (= normal-heading normal-rendered))
+      (is (= "A..." (subs long-rendered (- (count long-rendered) 4) (count long-rendered))))
+      (is (not= long-heading long-rendered)))))
+
+(deftest table-columns-test
+  (let [rows [["As" "Bs" "Cs"]
+              ["a" "b" "c"]]]
+    (testing "Column reordering is applied correctly to the table"
+      (let [{:keys [viz-tree]} (render.tu/make-viz-data
+                                rows :table {:reordered-columns {:order [1 0 2]}})]
+        (is (= ["Bs" "As" "Cs" "b" "a" "c"]
+               (-> viz-tree
+                   render.tu/remove-attrs
+                   ((juxt #(render.tu/nodes-with-tag % :th)
+                          #(render.tu/nodes-with-tag % :td)))
+                   (->> (apply concat))
+                   (->> (map second)))))))
+    (testing "A table with hidden columns does not render hidden columns"
+      (let [{:keys [viz-tree]} (render.tu/make-viz-data
+                                rows :table {:hidden-columns {:hide [1]}})]
+        (is (= ["As" "Cs" "a" "c"]
+               (-> viz-tree
+                   render.tu/remove-attrs
+                   ((juxt #(render.tu/nodes-with-tag % :th)
+                          #(render.tu/nodes-with-tag % :td)))
+                   (->> (apply concat))
+                   (->> (map second)))))))))
+
+(deftest table-column-formatting-test
+  (let [rows [["A" "B" "C" "D" "E"]
+              [0.1 9000 "2022-10-12T00:00:00Z" 0.123 0.6666667]]]
+    (testing "Custom column titles are respected in render."
+      (is (= ["Eh" "Bee" "Sea" "D" "E"]
+             (-> rows
+                 (render.tu/make-card-and-data :table)
+                 (render.tu/make-column-settings [{:column-title "Eh"}
+                                                  {:column-title "Bee"}
+                                                  {:column-title "Sea"}])
+                 render.tu/render-as-hiccup
+                 render.tu/remove-attrs
+                 (render.tu/nodes-with-tag :th)
+                 (->> (map second))))))
+    (testing "Column format settings are respected in render."
+      (is (= ["10%" "9E3" "12/10/2022" "---0.12___" "0.667"]
+             (-> rows
+                 (render.tu/make-card-and-data :table)
+                 (render.tu/make-column-settings [{:number-style "percent"}
+                                                  {:number-style "scientific"}
+                                                  {:date-style "D/M/YYYY"}
+                                                  {:prefix "---" :suffix "___"}
+                                                  {:decimals 3}])
+                 render.tu/render-as-hiccup
+                 render.tu/remove-attrs
+                 (render.tu/nodes-with-tag :td)
+                 (->> (map second))))))
+    (testing "Site Localization Settings are respected in columns."
+      (mt/with-temporary-setting-values [custom-formatting {:type/Temporal {:date_style      "D/M/YYYY"
+                                                                            :date_separator  "-"
+                                                                            :date_abbreviate false}
+                                                            :type/Number   {:number_separators ",."}}]
+        (is (= ["0,1" "9.000" "12-10-2022" "0,12" "0,67"]
+             (-> rows
+                 (render.tu/make-card-and-data :table)
+                 render.tu/render-as-hiccup
+                 render.tu/remove-attrs
+                 (render.tu/nodes-with-tag :td)
+                 (->> (map second)))))))))
+
+(defn- render-table [dashcard results]
+  (render/render-pulse-card :attachment "America/Los_Angeles" render.tu/test-card dashcard results))
+
+(deftest render-table-columns-test
+  (testing "Disabling a column has the same effect as not having the column at all."
+    (is (=
+         (render-table
+          {:visualization_settings {:table.columns
+                                    [{:name "b" :enabled true}]}}
+          {:data {:cols [{:name         "b",
+                          :display_name "b",
+                          :base_type    :type/BigInteger
+                          :semantic_type nil}]
+                  :rows [[2] [4]]}})
+         (render-table
+          {:visualization_settings {:table.columns
+                                    [{:name "a" :enabled false}
+                                     {:name "b" :enabled true}]}}
+          {:data {:cols [{:name         "a",
+                          :display_name "a",
+                          :base_type    :type/BigInteger
+                          :semantic_type nil}
+                         {:name         "b",
+                          :display_name "b",
+                          :base_type    :type/BigInteger
+                          :semantic_type nil}]
+                  :rows [[1 2] [3 4]]}}))))
+  (testing "Column order in table.columns is respected."
+    (is (=
+         (render-table
+          {:visualization_settings {:table.columns
+                                    [{:name "b" :enabled true}
+                                     {:name "a" :enabled true}]}}
+          {:data {:cols [{:name         "a",
+                          :display_name "a",
+                          :base_type    :type/BigInteger
+                          :semantic_type nil}
+                         {:name         "b",
+                          :display_name "b",
+                          :base_type    :type/BigInteger
+                          :semantic_type nil}]
+                  :rows [[1 2] [3 4]]}})
+         (render-table
+          {:visualization_settings {:table.columns
+                                    [{:name "b" :enabled true}
+                                     {:name "a" :enabled true}]}}
+          {:data {:cols [{:name         "b",
+                          :display_name "b",
+                          :base_type    :type/BigInteger
+                          :semantic_type nil}
+                         {:name         "a",
+                          :display_name "a",
+                          :base_type    :type/BigInteger
+                          :semantic_type nil}]
+                  :rows [[2 1] [4 3]]}}))))
+  (testing "visibility_type is respected in render."
+    (is (=
+         (render-table
+          {:visualization_settings {:table.columns
+                                    [{:name "a" :enabled true}
+                                     {:name "b" :enabled true}]}}
+          {:data {:cols [{:name            "a",
+                          :display_name    "a",
+                          :base_type       :type/BigInteger
+                          :visibility_type :normal
+                          :semantic_type   nil}
+                         {:name            "b",
+                          :display_name    "b",
+                          :base_type       :type/BigInteger
+                          :visibility_type :details-only
+                          :semantic_type   nil}]
+                  :rows [[1 2] [3 4]]}})
+         (render-table
+          {:visualization_settings {:table.columns
+                                    [{:name "a" :enabled true}]}}
+          {:data {:cols [{:name         "a",
+                          :display_name "a",
+                          :base_type    :type/BigInteger
+                          :semantic_type nil}]
+                  :rows [[1 2] [3 4]]}})))))
+
+(deftest attachment-rows-limit-test
+  (doseq [[test-explanation env-var-value expected]
+          [["defaults to 20 rows." nil 20]
+           ["is respected in table renders when below the default of 20." 5 5]
+           ["is respected in table renders when above the default of 20." 25 25]
+           ["is set to 20 when the value doesn't make sense." -20 20]
+           ["is limited to a max. of 100 rows." 200 100]]]
+    (testing (format "The `metabase.public-settings/attachment-rows-limit` %s" test-explanation)
+      (mt/with-temp-env-var-value! ["MB_ATTACHMENT_TABLE_ROW_LIMIT" env-var-value]
+        (is (= expected
+               (count (-> (render-table
+                           {:visualization_settings {:table.columns
+                                                     [{:name "a" :enabled true}]}}
+                           {:data {:cols [{:name         "a",
+                                           :display_name "a",
+                                           :base_type    :type/BigInteger
+                                           :semantic_type nil}]
+                                   :rows (repeat 200 ["I will keep default limits."])}})
+                          :content
+                          (render.tu/nodes-with-text "I will keep default limits.")))))))))

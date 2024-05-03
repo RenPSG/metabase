@@ -1,6 +1,4 @@
-import {
-  DatabaseDetails,
-  DatabaseInfo,
+import type {
   InviteInfo,
   Locale,
   SetupState,
@@ -33,22 +31,6 @@ export const createMockInviteInfo = (
   ...opts,
 });
 
-export const createMockDatabaseDetails = (
-  opts?: Partial<DatabaseDetails>,
-): DatabaseDetails => ({
-  ssl: false,
-  ...opts,
-});
-
-export const createMockDatabaseInfo = (
-  opts?: Partial<DatabaseInfo>,
-): DatabaseInfo => ({
-  name: "Database",
-  engine: "H2",
-  details: createMockDatabaseDetails(),
-  ...opts,
-});
-
 export const createMockSubscribeInfo = (
   opts?: Partial<SubscribeInfo>,
 ): SubscribeInfo => ({
@@ -59,8 +41,8 @@ export const createMockSubscribeInfo = (
 export const createMockSetupState = (
   opts?: Partial<SetupState>,
 ): SetupState => ({
-  step: 0,
+  step: "welcome",
   isLocaleLoaded: false,
-  isTrackingAllowed: false,
+  isTrackingAllowed: true,
   ...opts,
 });

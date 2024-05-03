@@ -1,4 +1,5 @@
 import styled from "@emotion/styled";
+
 import { color, darken } from "metabase/lib/colors";
 import { breakpointMinLarge } from "metabase/styled-components/theme";
 
@@ -34,13 +35,8 @@ export const TableLink = styled.div`
 
 export const TableBody = styled.div`
   border: 1px solid ${color("border")};
-  overflow: hidden;
   border-top: none;
-  border-radius: 0 0 0.5rem 0.5rem;
-
-  ${breakpointMinLarge} {
-    border-bottom-right-radius: 0;
-  }
+  border-bottom: 0;
 `;
 
 export const TableBodyRow = styled.div`
@@ -64,5 +60,15 @@ export const TableBodyCell = styled.div`
 
   ${breakpointMinLarge} {
     flex-grow: 0;
+  }
+`;
+
+export const TableFooter = styled.div`
+  padding: 1rem 1.5rem;
+  border: 1px solid ${color("border")};
+  border-radius: 0 0 0.5rem 0.5rem;
+
+  ${breakpointMinLarge} {
+    border-bottom-right-radius: 0;
   }
 `;

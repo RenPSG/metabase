@@ -1,6 +1,3 @@
-import uiThrottle from "raf-schd";
-import { isCypressActive } from "metabase/env";
-
 type ResizeObserverCallback = (
   entry: ResizeObserverEntry,
   observer: ResizeObserver,
@@ -16,19 +13,17 @@ function createResizeObserver() {
     });
   }
 
-  const observer = new ResizeObserver(
-    isCypressActive ? handler : uiThrottle(handler),
-  );
+  const observer = new ResizeObserver(handler);
 
   return {
     observer,
-    subscribe(target: HTMLElement, callback: ResizeObserverCallback) {
+    subscribe(target: Element, callback: ResizeObserverCallback) {
       observer.observe(target);
       const callbacks = callbacksMap.get(target) ?? [];
       callbacks.push(callback);
       callbacksMap.set(target, callbacks);
     },
-    unsubscribe(target: HTMLElement, callback: ResizeObserverCallback) {
+    unsubscribe(target: Element, callback: ResizeObserverCallback) {
       const callbacks = callbacksMap.get(target) ?? [];
       if (callbacks.length === 1) {
         observer.unobserve(target);
@@ -44,4 +39,5 @@ function createResizeObserver() {
   };
 }
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default createResizeObserver();

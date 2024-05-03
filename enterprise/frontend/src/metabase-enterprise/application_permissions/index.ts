@@ -1,3 +1,5 @@
+import { t } from "ttag";
+
 import {
   PLUGIN_ADMIN_ALLOWED_PATH_GETTERS,
   PLUGIN_APPLICATION_PERMISSIONS,
@@ -5,10 +7,9 @@ import {
 } from "metabase/plugins";
 import { hasPremiumFeature } from "metabase-enterprise/settings";
 
-import getRoutes from "./routes";
-import { t } from "ttag";
-import { canManageSubscriptions } from "./selectors";
 import applicationPermissionsReducer from "./reducer";
+import getRoutes from "./routes";
+import { canManageSubscriptions } from "./selectors";
 import {
   monitoringPermissionAllowedPathGetter,
   settingsPermissionAllowedPathGetter,

@@ -1,4 +1,5 @@
 import styled from "@emotion/styled";
+
 import { Tree } from "metabase/components/tree";
 import { color, lighten } from "metabase/lib/colors";
 
@@ -29,10 +30,10 @@ export const EmptyStateContainer = styled.div`
 export const AdminTreeNode = styled(Tree.Node)`
   color: ${props => (props.isSelected ? color("white") : color("text-medium"))};
 
-  background-color: ${props => (props.isSelected ? color("accent7") : "unset")};
+  background-color: ${props => (props.isSelected ? color("filter") : "unset")};
 
   &:hover {
     background-color: ${props =>
-      props.isSelected ? color("accent7") : lighten(color("accent7"), 0.6)};
+      props.isSelected ? color("filter") : lighten(color("filter"), 0.6)};
   }
 `;

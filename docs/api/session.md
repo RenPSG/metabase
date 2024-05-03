@@ -1,14 +1,12 @@
+---
+title: "Session"
+summary: |
+  /api/session endpoints.
+---
+
 # Session
 
 /api/session endpoints.
-
-  - [DELETE /api/session/](#delete-apisession)
-  - [GET /api/session/password_reset_token_valid](#get-apisessionpassword_reset_token_valid)
-  - [GET /api/session/properties](#get-apisessionproperties)
-  - [POST /api/session/](#post-apisession)
-  - [POST /api/session/forgot_password](#post-apisessionforgot_password)
-  - [POST /api/session/google_auth](#post-apisessiongoogle_auth)
-  - [POST /api/session/reset_password](#post-apisessionreset_password)
 
 ## `DELETE /api/session/`
 
@@ -20,15 +18,16 @@ Logout.
 
 ## `GET /api/session/password_reset_token_valid`
 
-Check is a password reset token is valid and isn't expired.
+Check if a password reset token is valid and isn't expired.
 
 ### PARAMS:
 
-*  **`token`** value must be a string.
+*  **`token`** value must be a non-blank string.
 
 ## `GET /api/session/properties`
 
-Get all global properties and their values. These are the specific `Settings` which are meant to be public.
+Get all properties and their values. These are the specific `Settings` that are readable by the current user, or are
+  public if no user is logged in.
 
 ## `POST /api/session/`
 
@@ -59,6 +58,34 @@ Login with Google Auth.
 ### PARAMS:
 
 *  **`token`** value must be a non-blank string.
+
+*  **`request`**
+
+## `POST /api/session/pulse/unsubscribe`
+
+Allow non-users to unsubscribe from pulses/subscriptions, with the hash given through email.
+
+### PARAMS:
+
+*  **`email`** string
+
+*  **`hash`** string
+
+*  **`pulse-id`** value must be an integer greater than zero.
+
+*  **`request`**
+
+## `POST /api/session/pulse/unsubscribe/undo`
+
+Allow non-users to undo an unsubscribe from pulses/subscriptions, with the hash given through email.
+
+### PARAMS:
+
+*  **`email`** string
+
+*  **`hash`** string
+
+*  **`pulse-id`** value must be an integer greater than zero.
 
 *  **`request`**
 

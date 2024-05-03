@@ -1,11 +1,12 @@
+---
+title: "Native query snippet"
+summary: |
+  Native query snippet (/api/native-query-snippet) endpoints.
+---
+
 # Native query snippet
 
 Native query snippet (/api/native-query-snippet) endpoints.
-
-  - [GET /api/native-query-snippet/](#get-apinative-query-snippet)
-  - [GET /api/native-query-snippet/:id](#get-apinative-query-snippetid)
-  - [POST /api/native-query-snippet/](#post-apinative-query-snippet)
-  - [PUT /api/native-query-snippet/:id](#put-apinative-query-snippetid)
 
 ## `GET /api/native-query-snippet/`
 
@@ -13,7 +14,7 @@ Fetch all snippets.
 
 ### PARAMS:
 
-*  **`archived`** value may be nil, or if non-nil, value must be a valid boolean string ('true' or 'false').
+*  **`archived`** nullable value must be a valid boolean string ('true' or 'false').
 
 ## `GET /api/native-query-snippet/:id`
 
@@ -21,7 +22,7 @@ Fetch native query snippet with ID.
 
 ### PARAMS:
 
-*  **`id`**
+*  **`id`** value must be an integer greater than zero.
 
 ## `POST /api/native-query-snippet/`
 
@@ -29,13 +30,13 @@ Create a new `NativeQuerySnippet`.
 
 ### PARAMS:
 
-*  **`content`** value must be a string.
+*  **`content`** string
 
-*  **`description`** value may be nil, or if non-nil, value must be a string.
+*  **`description`** nullable string
 
 *  **`name`** snippet names cannot include } or start with spaces
 
-*  **`collection_id`** value may be nil, or if non-nil, value must be an integer greater than zero.
+*  **`collection_id`** nullable value must be an integer greater than zero.
 
 ## `PUT /api/native-query-snippet/:id`
 
@@ -43,17 +44,17 @@ Update an existing `NativeQuerySnippet`.
 
 ### PARAMS:
 
-*  **`id`** 
+*  **`id`** value must be an integer greater than zero.
 
-*  **`archived`** value may be nil, or if non-nil, value must be a boolean.
+*  **`archived`** nullable boolean
 
-*  **`content`** value may be nil, or if non-nil, value must be a string.
+*  **`content`** nullable string
 
-*  **`description`** value may be nil, or if non-nil, value must be a string.
+*  **`description`** nullable string
 
-*  **`name`** value may be nil, or if non-nil, snippet names cannot include } or start with spaces
+*  **`name`** nullable snippet names cannot include } or start with spaces
 
-*  **`collection_id`** value may be nil, or if non-nil, value must be an integer greater than zero.
+*  **`collection_id`** nullable value must be an integer greater than zero.
 
 ---
 

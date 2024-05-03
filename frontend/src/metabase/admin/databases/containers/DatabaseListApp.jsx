@@ -1,27 +1,25 @@
 import { connect } from "react-redux";
-
-import MetabaseSettings from "metabase/lib/settings";
-import { isSyncInProgress } from "metabase/lib/syncing";
+import _ from "underscore";
 
 import LoadingAndGenericErrorWrapper from "metabase/components/LoadingAndGenericErrorWrapper";
-import { getUserIsAdmin } from "metabase/selectors/user";
-import { PLUGIN_FEATURE_LEVEL_PERMISSIONS } from "metabase/plugins";
-import DatabaseList from "../components/DatabaseList";
-
 import Database from "metabase/entities/databases";
+import MetabaseSettings from "metabase/lib/settings";
+import { isSyncInProgress } from "metabase/lib/syncing";
+import { PLUGIN_FEATURE_LEVEL_PERMISSIONS } from "metabase/plugins";
+import { getUserIsAdmin } from "metabase/selectors/user";
 
+import DatabaseList from "../components/DatabaseList";
+import {
+  deleteDatabase,
+  addSampleDatabase,
+  closeSyncingModal,
+} from "../database";
 import {
   getDeletes,
   getDeletionError,
   getIsAddingSampleDatabase,
   getAddSampleDatabaseError,
 } from "../selectors";
-import {
-  deleteDatabase,
-  addSampleDatabase,
-  closeSyncingModal,
-} from "../database";
-import _ from "underscore";
 
 const RELOAD_INTERVAL = 2000;
 

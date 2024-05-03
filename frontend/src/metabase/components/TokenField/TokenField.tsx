@@ -1,13 +1,14 @@
-import React, { Component } from "react";
+import cx from "classnames";
 import PropTypes from "prop-types";
+import { Component } from "react";
+import * as React from "react";
 import { findDOMNode } from "react-dom";
 import _ from "underscore";
-import cx from "classnames";
 
-import Icon from "metabase/components/Icon";
 import TippyPopover from "metabase/components/Popover/TippyPopover";
-import { TokenFieldAddon, TokenFieldItem } from "./TokenField.styled";
-
+import FormS from "metabase/css/components/form.module.css";
+import CS from "metabase/css/core/index.css";
+import { isObscured } from "metabase/lib/dom";
 import {
   KEYCODE_ESCAPE,
   KEYCODE_ENTER,
@@ -16,8 +17,18 @@ import {
   KEYCODE_DOWN,
   KEYCODE_BACKSPACE,
   KEY_COMMA,
+  KEY_ENTER,
+  KEY_BACKSPACE,
 } from "metabase/lib/keyboard";
-import { isObscured } from "metabase/lib/dom";
+import { Icon } from "metabase/ui";
+
+import { TokenFieldAddon, TokenFieldItem } from "../TokenFieldItem";
+
+import {
+  TokenInputItem,
+  TokenFieldContainer,
+  PrefixContainer,
+} from "./TokenField.styled";
 
 export type LayoutRendererArgs = {
   valuesList: React.ReactNode;
@@ -40,7 +51,7 @@ export type TokenFieldProps = {
   optionRenderer?: (option: any) => React.ReactNode;
   valueRenderer?: (value: any) => React.ReactNode;
   layoutRenderer?: (args: LayoutRendererArgs) => React.ReactNode;
-  color?: string;
+  color?: "brand";
   style?: React.CSSProperties;
   className?: string;
   valueStyle?: React.CSSProperties;
@@ -76,10 +87,7 @@ const defaultStyleValue = {
   fontWeight: 700,
 };
 
-export default class TokenField extends Component<
-  TokenFieldProps,
-  TokenFieldState
-> {
+class _TokenField extends Component<TokenFieldProps, TokenFieldState> {
   inputRef: React.RefObject<HTMLInputElement>;
   scrollElement = null;
 
@@ -258,11 +266,8 @@ export default class TokenField extends Component<
   onInputChange = ({
     target: { value },
   }: React.ChangeEvent<HTMLInputElement>) => {
-    const {
-      updateOnInputChange,
-      onInputChange,
-      parseFreeformValue,
-    } = this.props;
+    const { updateOnInputChange, onInputChange, parseFreeformValue } =
+      this.props;
 
     if (onInputChange) {
       value = onInputChange(value) || "";
@@ -307,9 +312,11 @@ export default class TokenField extends Component<
       // ",". Similarly, if you want to type "<" on the US keyboard layout, you
       // need to look at `key` to distinguish it from ",".
       key === KEY_COMMA ||
-      keyCode === KEYCODE_ENTER
+      keyCode === KEYCODE_ENTER ||
+      key === KEY_ENTER
     ) {
       if (this.addSelectedOption(event)) {
+        event.preventDefault();
         event.stopPropagation();
       }
     } else if (event.keyCode === KEYCODE_UP) {
@@ -334,7 +341,7 @@ export default class TokenField extends Component<
           selectedOptionValue: this._value(filteredOptions[index + 1]),
         });
       }
-    } else if (keyCode === KEYCODE_BACKSPACE) {
+    } else if (keyCode === KEYCODE_BACKSPACE || key === KEY_BACKSPACE) {
       // backspace
       const { value } = this.props;
       if (!this.state.inputValue && value.length > 0) {
@@ -417,7 +424,8 @@ export default class TokenField extends Component<
       // if we previously updated on input change then we don't need to do it again,
       if (this.props.updateOnInputChange) {
         // if multi=true also prevent the input from changing due to this key press
-        if (multi) {
+        const value = this.props.parseFreeformValue(input?.value);
+        if (multi && value !== null) {
           e.preventDefault();
         }
         // and clear the input
@@ -456,18 +464,12 @@ export default class TokenField extends Component<
     } else {
       onChange(valueToAdd.slice(0, 1));
     }
-    // reset the input value
-    // setTimeout(() =>
-    //   this.setInputValue("")
-    // )
   }
 
   removeValue(valueToRemove: any) {
     const { value, onChange } = this.props;
     const values = value.filter(v => !this._valueIsEqual(v, valueToRemove));
     onChange(values);
-    // reset the input value
-    // this.setInputValue("");
   }
 
   _valueIsEqual(v1: any, v2: any) {
@@ -540,7 +542,8 @@ export default class TokenField extends Component<
       selectedOptionValue,
     } = this.state;
 
-    if (!multi && isFocused) {
+    // for non-multi fields, keep the value in the input
+    if (!multi) {
       inputValue = inputValue || value[0];
       value = [];
     }
@@ -550,7 +553,8 @@ export default class TokenField extends Component<
       value.length > 0 &&
       updateOnInputChange &&
       parseFreeformValue &&
-      value[value.length - 1] === parseFreeformValue(inputValue)
+      value[value.length - 1] === parseFreeformValue(inputValue) &&
+      multi
     ) {
       if (isFocused) {
         // if focused, don't render the last value
@@ -573,25 +577,19 @@ export default class TokenField extends Component<
 
     const isControlledInput = !!this.onInputChange;
     const valuesList = (
-      <ul
-        className={cx(
-          className,
-          "pl1 pt1 pb0 pr0 flex align-center flex-wrap bg-white scroll-x scroll-y",
-        )}
-        style={{ maxHeight: 130, ...style }}
+      <TokenFieldContainer
+        style={style}
+        className={cx(className, {
+          "TokenField--focused": isFocused,
+        })}
         onMouseDownCapture={this.onMouseDownCapture}
       >
         {!!prefix && (
-          <span className="text-medium mb1 py1 pr1" data-testid="input-prefix">
-            {prefix}
-          </span>
+          <PrefixContainer data-testid="input-prefix">{prefix}</PrefixContainer>
         )}
         {value.map((v, index) => (
           <TokenFieldItem key={index} isValid={validateValue(v)}>
-            <span
-              style={{ ...defaultStyleValue, ...valueStyle }}
-              className={multi ? "pl1 pr0" : "px1"}
-            >
+            <span style={{ ...defaultStyleValue, ...valueStyle }}>
               {valueRenderer(v)}
             </span>
             {multi && (
@@ -600,20 +598,25 @@ export default class TokenField extends Component<
                 onClick={e => {
                   e.preventDefault();
                   this.removeValue(v);
+                  this.inputRef?.current?.blur();
                 }}
                 onMouseDown={e => e.preventDefault()}
               >
-                <Icon name="close" className="flex align-center" size={12} />
+                <Icon
+                  name="close"
+                  className={cx(CS.flex, CS.alignCenter)}
+                  size={12}
+                />
               </TokenFieldAddon>
             )}
           </TokenFieldItem>
         ))}
         {canAddItems && (
-          <li className={cx("flex-full flex align-center mr1 mb1 p1")}>
+          <TokenInputItem>
             <input
               ref={this.inputRef}
               style={{ ...defaultStyleValue, ...valueStyle }}
-              className={cx("full no-focus borderless px1")}
+              className={cx(CS.full, FormS.noFocus, CS.borderless, CS.px1)}
               // set size to be small enough that it fits in a parameter.
               size={10}
               placeholder={placeholder}
@@ -625,27 +628,43 @@ export default class TokenField extends Component<
               onBlur={this.onInputBlur}
               onPaste={this.onInputPaste}
             />
-          </li>
+          </TokenInputItem>
         )}
-      </ul>
+      </TokenFieldContainer>
     );
 
     const optionsList =
       filteredOptions.length === 0 ? null : (
         <ul
-          className={cx(optionsClassName, "overflow-auto pl1 my1 scroll-hide")}
+          className={cx(
+            optionsClassName,
+            CS.overflowAuto,
+            CS.pl1,
+            CS.my1,
+            CS.scrollHide,
+          )}
           style={{ maxHeight: 300, ...optionsStyle }}
           onMouseEnter={() => this.setState({ listIsHovered: true })}
           onMouseLeave={() => this.setState({ listIsHovered: false })}
         >
           {filteredOptions.map(option => (
-            <li className="mr1" key={this._key(option)}>
+            <li className={CS.mr1} key={this._key(option)}>
               <div
                 className={cx(
-                  `py1 pl1 pr2 block rounded text-bold text-${color}-hover inline-block full cursor-pointer`,
-                  `bg-light-hover`,
+                  CS.py1,
+                  CS.pl1,
+                  CS.pr2,
+                  CS.block,
+                  CS.rounded,
+                  CS.textBold,
+                  CS.inlineBlock,
+                  CS.full,
+                  CS.cursorPointer,
+                  CS.bgLightHover,
                   {
-                    [`text-${color} bg-light`]:
+                    [cx(CS.bgLight, {
+                      [color]: CS.textBrand,
+                    })]:
                       !this.state.listIsHovered &&
                       this._valueIsEqual(
                         selectedOptionValue,
@@ -706,3 +725,14 @@ DefaultTokenFieldLayout.propTypes = {
   optionsList: PropTypes.element,
   isFocused: PropTypes.bool,
 };
+
+/**
+ * @deprecated use MultiSelect or Autocomplete from metabase/ui
+ */
+const TokenField = Object.assign(_TokenField, {
+  FieldItem: TokenFieldItem,
+  NewItemInputContainer: TokenInputItem,
+});
+
+// eslint-disable-next-line import/no-default-export
+export default TokenField;

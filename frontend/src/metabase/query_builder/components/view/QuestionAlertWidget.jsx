@@ -1,15 +1,17 @@
 /* eslint-disable react/prop-types */
-import React from "react";
-
 import cx from "classnames";
+import { createRef, Component } from "react";
 import { t } from "ttag";
 
-import Icon from "metabase/components/Icon";
 import Popover from "metabase/components/Popover";
+import CS from "metabase/css/core/index.css";
+import { Icon } from "metabase/ui";
 
 import AlertListPopoverContent from "../AlertListPopoverContent";
 
-export default class QuestionAlertWidget extends React.Component {
+import { AlertIcon } from "./QuestionAlertWidget.styled";
+
+export default class QuestionAlertWidget extends Component {
   state = {
     isOpen: false,
     // this isFrozen nonsense is due to AlertListPopoverContent containing a <Modal>
@@ -24,6 +26,12 @@ export default class QuestionAlertWidget extends React.Component {
   freeze = () => {
     this.setState({ isFrozen: true });
   };
+
+  constructor(props, context) {
+    super(props, context);
+
+    this.rootRef = createRef();
+  }
 
   render() {
     const {
@@ -41,14 +49,15 @@ export default class QuestionAlertWidget extends React.Component {
 
     if (question.isSaved() && Object.values(questionAlerts).length > 0) {
       return (
-        <span onClick={this.open}>
+        <span onClick={this.open} ref={this.rootRef}>
           <Icon
             name="bell"
-            className={cx(className, "text-brand cursor-pointer")}
+            className={cx(className, CS.textBrand, CS.cursorPointer)}
           />
           <Popover
+            target={this.rootRef.current}
             isOpen={isOpen}
-            className={isFrozen ? "hide" : null}
+            className={isFrozen ? CS.hide : null}
             onClose={this.close}
           >
             <AlertListPopoverContent
@@ -60,10 +69,11 @@ export default class QuestionAlertWidget extends React.Component {
       );
     } else {
       return (
-        <Icon
+        <AlertIcon
           name="bell"
           tooltip={t`Get alerts`}
-          className={cx(className, "text-brand-hover cursor-pointer")}
+          size={20}
+          className={className}
           onClick={onCreateAlert}
         />
       );

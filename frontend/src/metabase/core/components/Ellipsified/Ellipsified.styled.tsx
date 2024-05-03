@@ -1,5 +1,5 @@
-import styled from "@emotion/styled";
 import { css } from "@emotion/react";
+import styled from "@emotion/styled";
 
 const ellipsifyCss = css`
   overflow: hidden;
@@ -12,13 +12,14 @@ const clampCss = (props: EllipsifiedRootProps) => css`
   -webkit-line-clamp: ${props.lines};
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: break-word;
 `;
 
 interface EllipsifiedRootProps {
   lines?: number;
-  "data-testId"?: string;
+  "data-testid"?: string;
 }
 
 export const EllipsifiedRoot = styled.div<EllipsifiedRootProps>`
-  ${props => (props.lines ?? 1 > 1 ? clampCss(props) : ellipsifyCss)};
+  ${props => ((props.lines ?? 1) > 1 ? clampCss(props) : ellipsifyCss)};
 `;

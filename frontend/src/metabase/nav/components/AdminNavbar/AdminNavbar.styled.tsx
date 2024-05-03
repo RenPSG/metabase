@@ -1,10 +1,12 @@
 import styled from "@emotion/styled";
+
 import Link from "metabase/core/components/Link";
 import { alpha, color, darken } from "metabase/lib/colors";
 import {
   breakpointMaxLarge,
   breakpointMaxMedium,
 } from "metabase/styled-components/theme";
+
 import { ADMIN_NAVBAR_HEIGHT } from "../../constants";
 
 export const AdminNavbarRoot = styled.nav`
@@ -16,6 +18,9 @@ export const AdminNavbarRoot = styled.nav`
   display: flex;
   align-items: center;
   justify-content: space-between;
+
+  z-index: 4;
+  flex-shrink: 0;
 `;
 
 export const AdminNavbarItems = styled.ul`
@@ -67,14 +72,16 @@ export const AdminExitLink = styled(Link)`
 
   &:hover {
     color: ${color("white")};
-    background-color: ${darken(color("accent7"))};
-    border-color: ${darken(color("accent7"))};
+    background-color: ${darken(color("filter"))};
+    border-color: ${darken(color("filter"))};
   }
 `;
 
 export const AdminLogoContainer = styled.div`
   display: flex;
   min-width: 32px;
+  max-width: 20rem;
+  overflow: hidden;
   height: 32px;
   align-items: center;
   justify-content: center;

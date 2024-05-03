@@ -1,10 +1,9 @@
-import React from "react";
 import cx from "classnames";
+import type * as React from "react";
 import _ from "underscore";
 
-import TippyPopover, {
-  ITippyPopoverProps,
-} from "metabase/components/Popover/TippyPopover";
+import type { ITippyPopoverProps } from "metabase/components/Popover/TippyPopover";
+import TippyPopover from "metabase/components/Popover/TippyPopover";
 
 import { TriggerButton } from "./ControlledPopoverWithTrigger.styled";
 
@@ -42,8 +41,12 @@ export type RenderTrigger = (
 type RenderTriggerArgs = {
   visible: boolean;
   onClick: () => void;
+  closePopover: () => void;
 };
 
+/**
+ * @deprecated prefer Popover from "metabase/ui" instead
+ */
 function ControlledPopoverWithTrigger({
   triggerClasses,
   triggerStyle,
@@ -65,9 +68,14 @@ function ControlledPopoverWithTrigger({
   };
 
   const computedTrigger = _.isFunction(renderTrigger) ? (
-    renderTrigger({ visible, onClick: handleTriggerClick })
+    renderTrigger({
+      visible,
+      onClick: handleTriggerClick,
+      closePopover: onClose,
+    })
   ) : (
     <TriggerButton
+      type="button"
       disabled={disabled}
       className={cx(
         triggerClasses,
@@ -101,4 +109,5 @@ function ControlledPopoverWithTrigger({
   );
 }
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default ControlledPopoverWithTrigger;

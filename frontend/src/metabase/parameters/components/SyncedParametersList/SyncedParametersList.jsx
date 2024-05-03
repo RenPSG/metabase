@@ -1,13 +1,13 @@
-import React from "react";
 import PropTypes from "prop-types";
 
-import ParametersList from "metabase/parameters/components/ParametersList";
-import { getParameterValuesBySlug } from "metabase/parameters/utils/parameter-values";
 import { useSyncedQueryString } from "metabase/hooks/use-synced-query-string";
+import ParametersList from "metabase/parameters/components/ParametersList";
+import { getParameterValuesBySlug } from "metabase-lib/v1/parameters/utils/parameter-values";
 
 const propTypes = {
   parameters: PropTypes.array.isRequired,
   editingParameter: PropTypes.object,
+  question: PropTypes.object,
   dashboard: PropTypes.object,
 
   className: PropTypes.string,
@@ -18,14 +18,17 @@ const propTypes = {
   isEditing: PropTypes.bool,
   commitImmediately: PropTypes.bool,
 
-  setParameterValue: PropTypes.func.isRequired,
+  setParameterValue: PropTypes.func,
   setParameterIndex: PropTypes.func,
   setEditingParameter: PropTypes.func,
+  setParameterValueToDefault: PropTypes.func,
+  enableParameterRequiredBehavior: PropTypes.bool,
 };
 
 export function SyncedParametersList({
   parameters,
   editingParameter,
+  question,
   dashboard,
 
   className,
@@ -39,21 +42,19 @@ export function SyncedParametersList({
   setParameterValue,
   setParameterIndex,
   setEditingParameter,
+  setParameterValueToDefault,
+  enableParameterRequiredBehavior,
 }) {
   useSyncedQueryString(
-    () =>
-      getParameterValuesBySlug(
-        parameters,
-        undefined,
-        dashboard && { preserveDefaultedParameters: true },
-      ),
-    [parameters, dashboard],
+    () => getParameterValuesBySlug(parameters),
+    [parameters],
   );
 
   return (
     <ParametersList
       className={className}
       parameters={parameters}
+      question={question}
       dashboard={dashboard}
       editingParameter={editingParameter}
       isFullscreen={isFullscreen}
@@ -64,6 +65,8 @@ export function SyncedParametersList({
       setParameterValue={setParameterValue}
       setParameterIndex={setParameterIndex}
       setEditingParameter={setEditingParameter}
+      setParameterValueToDefault={setParameterValueToDefault}
+      enableParameterRequiredBehavior={enableParameterRequiredBehavior}
     />
   );
 }

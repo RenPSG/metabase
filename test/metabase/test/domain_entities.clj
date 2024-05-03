@@ -1,6 +1,7 @@
 (ns metabase.test.domain-entities
-  (:require [clojure.test :refer :all]
-            [metabase.domain-entities.specs :as de.specs]))
+  (:require
+   [clojure.test :refer :all]
+   [metabase.domain-entities.specs :as de.specs]))
 
 (def test-domain-entity-specs
   "A test domain specs written against our test DB."
@@ -23,7 +24,7 @@
        (map (fn [spec]
               [(:name spec) (-> spec
                                 (#'de.specs/add-to-hiearchy!)
-                                (#'de.specs/domain-entity-spec-parser))]))
+                                (#'de.specs/coerce-to-domain-entity-spec))]))
        (into {})))
 
 (defmacro with-test-domain-entity-specs

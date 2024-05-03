@@ -1,26 +1,29 @@
 (ns metabase.async.streaming-response
-  (:require [cheshire.core :as json]
-            [clojure.core.async :as a]
-            [clojure.tools.logging :as log]
-            compojure.response
-            [metabase.async.streaming-response.thread-pool :as thread-pool]
-            [metabase.async.util :as async.u]
-            [metabase.server.protocols :as server.protocols]
-            [metabase.util :as u]
-            [metabase.util.i18n :refer [trs]]
-            [potemkin.types :as p.types]
-            [pretty.core :as pretty]
-            [ring.util.response :as response]
-            [ring.util.servlet :as servlet])
-  (:import [java.io BufferedWriter OutputStream OutputStreamWriter]
-           java.nio.ByteBuffer
-           [java.nio.channels ClosedChannelException SocketChannel]
-           java.nio.charset.StandardCharsets
-           java.util.zip.GZIPOutputStream
-           javax.servlet.AsyncContext
-           javax.servlet.http.HttpServletResponse
-           org.eclipse.jetty.io.EofException
-           org.eclipse.jetty.server.Request))
+  (:require
+   [cheshire.core :as json]
+   [clojure.core.async :as a]
+   [compojure.response]
+   [metabase.async.streaming-response.thread-pool :as thread-pool]
+   [metabase.async.util :as async.u]
+   [metabase.server.protocols :as server.protocols]
+   [metabase.util :as u]
+   [metabase.util.log :as log]
+   [potemkin.types :as p.types]
+   [pretty.core :as pretty]
+   [ring.util.jakarta.servlet :as servlet]
+   [ring.util.response :as response])
+  (:import
+   (java.io BufferedWriter OutputStream OutputStreamWriter)
+   (java.nio ByteBuffer)
+   (java.nio.channels ClosedChannelException SocketChannel)
+   (java.nio.charset StandardCharsets)
+   (java.util.zip GZIPOutputStream)
+   (jakarta.servlet AsyncContext)
+   (jakarta.servlet.http HttpServletResponse)
+   (org.eclipse.jetty.io EofException)
+   (org.eclipse.jetty.server Request)))
+
+(set! *warn-on-reflection* true)
 
 (defn- write-to-output-stream!
   ([^OutputStream os x]
@@ -58,7 +61,7 @@
           (json/generate-stream obj writer))
         (catch EofException _)
         (catch Throwable e
-          (log/error e (trs "Error writing error to output stream") obj))))))
+          (log/error e "Error writing error to output stream" obj))))))
 
 (defn- do-f* [f ^OutputStream os _finished-chan canceled-chan]
   (try
@@ -70,20 +73,20 @@
       (a/>!! canceled-chan ::thread-interrupted)
       nil)
     (catch Throwable e
-      (log/error e (trs "Caught unexpected Exception in streaming response body"))
+      (log/error e "Caught unexpected Exception in streaming response body")
       (write-error! os e)
       nil)))
 
 (defn- do-f-async
-  "Runs `f` asynchronously on the streaming response `thread-pool`, returning immediately. When `f` finishes, completes (i.e., closes) Jetty
-  `async-context`."
+  "Runs `f` asynchronously on the streaming response `thread-pool`, returning immediately. When `f` finishes,
+  completes (i.e., closes) Jetty `async-context`."
   [^AsyncContext async-context f ^OutputStream os finished-chan canceled-chan]
   {:pre [(some? os)]}
   (let [task (^:once fn* []
                (try
                  (do-f* f os finished-chan canceled-chan)
                  (catch Throwable e
-                   (log/error e (trs "bound-fn caught unexpected Exception"))
+                   (log/error e "bound-fn caught unexpected Exception")
                    (a/>!! finished-chan :unexpected-error))
                  (finally
                    (a/>!! finished-chan (if (a/poll! canceled-chan)
@@ -145,7 +148,7 @@
     (catch ClosedChannelException _
       true)
     (catch Throwable e
-      (log/error e (trs "Error determining whether HTTP request was canceled"))
+      (log/error e "Error determining whether HTTP request was canceled")
       false)))
 
 (def ^:private async-cancellation-poll-timeout-ms
@@ -169,8 +172,8 @@
           ;; was completed) then close `canceled-status-chan` which will kill the underlying thread
           (a/close! canceled-status-chan)
           (when (= port status-timeout-chan)
-            (log/debug (trs "Check cancelation status timed out after {0}"
-                            (u/format-milliseconds async-cancellation-poll-timeout-ms))))
+            (log/debugf "Check cancelation status timed out after %s"
+                        (u/format-milliseconds async-cancellation-poll-timeout-ms)))
           (when (not= port finished-chan)
             (if canceled?
               (a/>! canceled-chan ::request-canceled)
@@ -191,11 +194,11 @@
           (start-async-cancel-loop! request finished-chan canceled-chan)
           (do-f-async async-context f delay-os finished-chan canceled-chan)))
       (catch Throwable e
-        (log/error e (trs "Unexpected exception in do-f-async"))
+        (log/error e "Unexpected exception in do-f-async")
         (try
           (.sendError response 500 (.getMessage e))
           (catch Throwable e
-            (log/error e (trs "Unexpected exception writing error response"))))
+            (log/error e "Unexpected exception writing error response")))
         (a/>!! finished-chan :unexpected-error)
         (a/close! finished-chan)
         (a/close! canceled-chan)
@@ -206,7 +209,7 @@
 (p.types/deftype+ StreamingResponse [f options donechan]
   pretty/PrettyPrintable
   (pretty [_]
-    (list (pretty/qualify-symbol-for-*ns* `->StreamingResponse) f options donechan))
+    (list `->StreamingResponse f options donechan))
 
   server.protocols/Respond
   (respond [_this context]
@@ -219,10 +222,9 @@
 
   ;; async responses only
   compojure.response/Sendable
-  (send* [this request respond* _]
+  (send* [this request respond* _raise]
     (respond* (compojure.response/render this request))))
 
-;; TODO -- don't think any of this is needed any mo
 (defn- render [^StreamingResponse streaming-response gzip?]
   (let [{:keys [headers content-type], :as options} (.options streaming-response)]
     (assoc (response/response (if gzip?
@@ -232,7 +234,7 @@
                                 streaming-response))
            :headers      (cond-> (assoc headers "Content-Type" content-type)
                            gzip? (assoc "Content-Encoding" "gzip"))
-           :status       202)))
+           :status       (or (:status options) 202))))
 
 (defn finished-chan
   "Fetch a promise channel that will get a message when a `StreamingResponse` is completely finished. Provided primarily
@@ -240,8 +242,8 @@
   [^StreamingResponse response]
   (.donechan response))
 
-(defn streaming-response*
-  "Impl for `streaming-response` macro."
+(defn -streaming-response
+  "Impl for [[streaming-response]] macro."
   [f options]
   (->StreamingResponse f options (a/promise-chan)))
 
@@ -263,5 +265,5 @@
   {:style/indent 2, :arglists '([options [os-binding canceled-chan-binding] & body])}
   [options [os-binding canceled-chan-binding :as bindings] & body]
   {:pre [(= (count bindings) 2)]}
-  `(streaming-response* (bound-fn [~(vary-meta os-binding assoc :tag 'java.io.OutputStream) ~canceled-chan-binding] ~@body)
+  `(-streaming-response (bound-fn [~(vary-meta os-binding assoc :tag 'java.io.OutputStream) ~canceled-chan-binding] ~@body)
                         ~options))

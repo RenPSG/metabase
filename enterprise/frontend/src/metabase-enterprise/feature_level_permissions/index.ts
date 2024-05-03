@@ -1,10 +1,9 @@
-import { hasPremiumFeature } from "metabase-enterprise/settings";
+import { DATA_PERMISSIONS_TOOLBAR_CONTENT } from "metabase/admin/permissions/pages/DataPermissionsPage/DataPermissionsPage";
 import {
   PLUGIN_ADMIN_ALLOWED_PATH_GETTERS,
   PLUGIN_FEATURE_LEVEL_PERMISSIONS,
 } from "metabase/plugins";
-
-import { DATA_PERMISSIONS_TOOLBAR_CONTENT } from "metabase/admin/permissions/pages/DataPermissionsPage/DataPermissionsPage";
+import { hasPremiumFeature } from "metabase-enterprise/settings";
 
 import { getFeatureLevelDataPermissions } from "./permission-management";
 import {
@@ -23,10 +22,12 @@ if (hasPremiumFeature("advanced_permissions")) {
     databaseManagementPermissionAllowedPathGetter,
   );
 
-  PLUGIN_FEATURE_LEVEL_PERMISSIONS.getFeatureLevelDataPermissions = getFeatureLevelDataPermissions;
+  PLUGIN_FEATURE_LEVEL_PERMISSIONS.getFeatureLevelDataPermissions =
+    getFeatureLevelDataPermissions;
 
   PLUGIN_FEATURE_LEVEL_PERMISSIONS.getDataColumns = getDataColumns;
-  PLUGIN_FEATURE_LEVEL_PERMISSIONS.getDownloadWidgetMessageOverride = getDownloadWidgetMessageOverride;
+  PLUGIN_FEATURE_LEVEL_PERMISSIONS.getDownloadWidgetMessageOverride =
+    getDownloadWidgetMessageOverride;
   PLUGIN_FEATURE_LEVEL_PERMISSIONS.canDownloadResults = canDownloadResults;
 
   PLUGIN_FEATURE_LEVEL_PERMISSIONS.dataModelQueryProps = {

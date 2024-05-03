@@ -1,7 +1,9 @@
-import { MouseEvent } from "react";
-import { Column } from "metabase-types/types/Dataset";
 import { formatValue } from "metabase/lib/formatting";
-import { VisualizationSettings } from "./types";
+import type {
+  ComputedVisualizationSettings,
+  RemappingHydratedDatasetColumn,
+} from "metabase/visualizations/types";
+import type { DatasetColumn } from "metabase-types/api";
 
 export const formatValueForTooltip = ({
   value,
@@ -9,8 +11,8 @@ export const formatValueForTooltip = ({
   settings,
 }: {
   value?: unknown;
-  column?: Column;
-  settings?: VisualizationSettings;
+  column?: RemappingHydratedDatasetColumn | DatasetColumn | null;
+  settings?: ComputedVisualizationSettings;
 }) =>
   formatValue(value, {
     ...(settings && settings.column && column
@@ -19,16 +21,3 @@ export const formatValueForTooltip = ({
     type: "tooltip",
     majorWidth: 0,
   });
-
-export const getEventTarget = (event: MouseEvent) => {
-  let target = document.getElementById("popover-event-target");
-  if (!target) {
-    target = document.createElement("div");
-    target.id = "popover-event-target";
-    document.body.appendChild(target);
-  }
-  target.style.left = event.clientX - 3 + "px";
-  target.style.top = event.clientY - 3 + "px";
-
-  return target;
-};

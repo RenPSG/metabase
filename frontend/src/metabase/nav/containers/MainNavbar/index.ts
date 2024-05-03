@@ -1,1 +1,2 @@
-export { default } from "./MainNavbarContainer";
+// eslint-disable-next-line import/no-default-export -- deprecated usage
+export { default } from "./MainNavbar";

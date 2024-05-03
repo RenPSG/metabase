@@ -1,80 +1,80 @@
-import React, { useState } from "react";
+import { useCallback, useState } from "react";
 import { t } from "ttag";
-import Users from "metabase/entities/users";
-import Form from "metabase/containers/Form";
-import { SubscribeInfo } from "metabase-types/store";
+import * as Yup from "yup";
+
+import FormSubmitButton from "metabase/core/components/FormSubmitButton";
+import { FormProvider } from "metabase/forms";
+import * as Errors from "metabase/lib/errors";
+import { useSelector } from "metabase/lib/redux";
+import type { SubscribeInfo } from "metabase-types/store";
+
+import { getUserEmail } from "../../selectors";
+import { subscribeToNewsletter } from "../../utils";
+
 import {
-  FormContainer,
-  FormFieldContainer,
-  FormHeader,
-  FormLabel,
-  FormLabelCard,
-  FormLabelIcon,
-  FormLabelText,
-  FormRoot,
-  FormSuccessContainer,
-  FormSuccessIcon,
-  FormSuccessText,
+  EmailForm,
+  EmailFormHeader,
+  EmailFormLabel,
+  EmailFormLabelCard,
+  EmailFormLabelIcon,
+  EmailFormLabelText,
+  EmailFormRoot,
+  EmailFormSuccessContainer,
+  EmailFormSuccessIcon,
+  EmailFormSuccessText,
+  EmailFormInput,
 } from "./NewsletterForm.styled";
-import { FormProps } from "./types";
 
-export interface NewsletterFormProps {
-  initialEmail?: string;
-  onSubscribe: (email: string) => void;
-}
+const NEWSLETTER_SCHEMA = Yup.object({
+  email: Yup.string().required(Errors.required).email(Errors.email),
+});
 
-const NewsletterForm = ({
-  initialEmail = "",
-  onSubscribe,
-}: NewsletterFormProps): JSX.Element => {
-  const initialValues = { email: initialEmail };
+export const NewsletterForm = (): JSX.Element => {
+  const initialEmail = useSelector(getUserEmail);
+  const initialValues = { email: initialEmail ?? "" };
   const [isSubscribed, setIsSubscribed] = useState(false);
 
-  const onSubmit = async ({ email }: SubscribeInfo) => {
-    await onSubscribe(email);
+  const handleSubmit = useCallback(async ({ email }: SubscribeInfo) => {
+    await subscribeToNewsletter(email);
     setIsSubscribed(true);
-  };
+  }, []);
 
   return (
-    <FormRoot>
-      <FormLabel>
-        <FormLabelCard>
-          <FormLabelIcon name="mail" />
-          <FormLabelText>{t`Metabase Newsletter`}</FormLabelText>
-        </FormLabelCard>
-      </FormLabel>
-      <FormHeader>
+    <EmailFormRoot>
+      <EmailFormLabel>
+        <EmailFormLabelCard>
+          <EmailFormLabelIcon name="mail" />
+          <EmailFormLabelText>{t`Metabase Newsletter`}</EmailFormLabelText>
+        </EmailFormLabelCard>
+      </EmailFormLabel>
+      <EmailFormHeader>
         {t`Get infrequent emails about new releases and feature updates.`}
-      </FormHeader>
+      </EmailFormHeader>
       {!isSubscribed && (
-        <Form
-          form={Users.forms.newsletter}
+        <FormProvider
           initialValues={initialValues}
-          submitTitle={t`Subscribe`}
-          onSubmit={onSubmit}
+          validationSchema={NEWSLETTER_SCHEMA}
+          onSubmit={handleSubmit}
         >
-          {({ Form, FormField, FormSubmit }: FormProps) => (
-            <Form>
-              <FormContainer>
-                <FormFieldContainer>
-                  <FormField name="email" />
-                </FormFieldContainer>
-                <FormSubmit primary={false} />
-              </FormContainer>
-            </Form>
-          )}
-        </Form>
+          <EmailForm>
+            <EmailFormInput
+              name="email"
+              type="email"
+              placeholder="nicetoseeyou@email.com"
+              autoFocus
+            />
+            <FormSubmitButton title={t`Subscribe`} />
+          </EmailForm>
+        </FormProvider>
       )}
       {isSubscribed && (
-        <FormSuccessContainer>
-          <FormSuccessIcon name="check" />
-          <FormSuccessText>
+        <EmailFormSuccessContainer>
+          <EmailFormSuccessIcon name="check" />
+          <EmailFormSuccessText>
             {t`You're subscribed. Thanks for using Metabase!`}
-          </FormSuccessText>
-        </FormSuccessContainer>
+          </EmailFormSuccessText>
+        </EmailFormSuccessContainer>
       )}
-    </FormRoot>
+    </EmailFormRoot>
   );
 };
-
-export default NewsletterForm;

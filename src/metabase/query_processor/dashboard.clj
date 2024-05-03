@@ -1,34 +1,43 @@
 (ns metabase.query-processor.dashboard
   "Code for running a query in the context of a specific DashboardCard."
-  (:require [clojure.tools.logging :as log]
-            [medley.core :as m]
-            [metabase.api.common :as api]
-            [metabase.driver.common.parameters.operators :as params.ops]
-            [metabase.mbql.normalize :as mbql.normalize]
-            [metabase.models.dashboard :as dashboard :refer [Dashboard]]
-            [metabase.models.dashboard-card :refer [DashboardCard]]
-            [metabase.models.dashboard-card-series :refer [DashboardCardSeries]]
-            [metabase.query-processor.card :as qp.card]
-            [metabase.query-processor.error-type :as qp.error-type]
-            [metabase.query-processor.middleware.constraints :as qp.constraints]
-            [metabase.util :as u]
-            [metabase.util.i18n :refer [tru]]
-            [metabase.util.schema :as su]
-            [schema.core :as s]
-            [toucan.db :as db]))
+  (:require
+   [clojure.string :as str]
+   [medley.core :as m]
+   [metabase.api.common :as api]
+   [metabase.driver.common.parameters.operators :as params.ops]
+   [metabase.legacy-mbql.normalize :as mbql.normalize]
+   [metabase.lib.schema.id :as lib.schema.id]
+   [metabase.models.dashboard :as dashboard :refer [Dashboard]]
+   [metabase.models.dashboard-card :refer [DashboardCard]]
+   [metabase.models.dashboard-card-series :refer [DashboardCardSeries]]
+   [metabase.models.user-parameter-value :as user-parameter-value]
+   [metabase.query-processor.card :as qp.card]
+   [metabase.query-processor.error-type :as qp.error-type]
+   [metabase.query-processor.middleware.constraints :as qp.constraints]
+   [metabase.util :as u]
+   [metabase.util.i18n :refer [tru]]
+   [metabase.util.log :as log]
+   [metabase.util.malli :as mu]
+   [steffan-westcott.clj-otel.api.trace.span :as span]
+   #_{:clj-kondo/ignore [:discouraged-namespace]}
+   [toucan2.core :as t2]))
 
-(defn- check-card-is-in-dashboard
-  "Check that the Card with `card-id` is in Dashboard with `dashboard-id`, either in a DashboardCard at the top level or
-  as a series, or throw an Exception. If not such relationship exists this will throw a 404 Exception."
-  [card-id dashboard-id]
+(defn- check-card-and-dashcard-are-in-dashboard
+  "Check that the Card with `card-id` is in Dashboard with `dashboard-id`, either in the DashboardCard with
+  `dashcard-id` at the top level or as a series. If not such relationship exists this will throw a 404 Exception."
+  [dashboard-id card-id dashcard-id]
   (api/check-404
-   (or (db/exists? DashboardCard
+   (or (t2/exists? DashboardCard
+         :id           dashcard-id
          :dashboard_id dashboard-id
          :card_id      card-id)
-       (when-let [dashcard-ids (db/select-ids DashboardCard :dashboard_id dashboard-id)]
-         (db/exists? DashboardCardSeries
-           :card_id          card-id
-           :dashboardcard_id [:in dashcard-ids])))))
+       (and
+        (t2/exists? DashboardCard
+          :id           dashcard-id
+          :dashboard_id dashboard-id)
+        (t2/exists? DashboardCardSeries
+          :card_id          card-id
+          :dashboardcard_id dashcard-id)))))
 
 (defn- resolve-param-for-card
   [card-id dashcard-id param-id->param {param-id :id, :as request-param}]
@@ -59,7 +68,8 @@
       (when (:type request-param)
         (qp.card/check-allowed-parameter-value-type
          param-id
-         (or (when (= (:type matching-param) :dimension)
+         (or (when (and (= (:type matching-param) :dimension)
+                        (not= (:widget-type matching-param) :none))
                (:widget-type matching-param))
              (:type matching-param))
          (:type request-param)))
@@ -69,10 +79,13 @@
        request-param
        ;; if value comes in as a lone value for an operator filter type (as will be the case for embedding) wrap it in a
        ;; vector so the parameter handling code doesn't explode.
-       (when (and (params.ops/operator? (:type matching-param))
-                  (seq (:value request-param))
-                  (not (sequential? (:value request-param))))
-         {:value [(:value request-param)]})
+       (let [value (:value request-param)]
+         (when (and (params.ops/operator? (:type matching-param))
+                    (if (string? value)
+                      (not (str/blank? value))
+                      (some? value))
+                    (not (sequential? value)))
+           {:value [value]}))
        {:id     param-id
         :target (:target matching-mapping)}))))
 
@@ -102,20 +115,22 @@
                    target)))
    dashboard-param-id->param))
 
-(s/defn ^:private resolve-params-for-query :- (s/maybe [su/Map])
+(mu/defn ^:private resolve-params-for-query :- [:maybe [:sequential :map]]
   "Given a sequence of parameters included in a query-processing request to run the query for a Dashboard/Card, validate
   that those parameters exist and have allowed types, and merge in default values and other info from the parameter
   mappings."
-  [dashboard-id   :- su/IntGreaterThanZero
-   card-id        :- su/IntGreaterThanZero
-   dashcard-id    :- su/IntGreaterThanZero
-   request-params :- (s/maybe [su/Map])]
+  [dashboard-id   :- ::lib.schema.id/dashboard
+   card-id        :- ::lib.schema.id/card
+   dashcard-id    :- ::lib.schema.id/dashcard
+   request-params :- [:maybe [:sequential :map]]]
   (log/tracef "Resolving Dashboard %d Card %d query request parameters" dashboard-id card-id)
   (let [request-params            (mbql.normalize/normalize-fragment [:parameters] request-params)
         ;; ignore default values in request params as well. (#20516)
         request-params            (for [param request-params]
                                     (dissoc param :default))
-        dashboard                 (api/check-404 (db/select-one Dashboard :id dashboard-id))
+        dashboard                 (-> (t2/select-one Dashboard :id dashboard-id)
+                                      (t2/hydrate :resolved-params)
+                                      (api/check-404))
         dashboard-param-id->param (into {}
                                         ;; remove the `:default` values from Dashboard params. We don't ACTUALLY want to
                                         ;; use these values ourselves -- the expectation is that the frontend will pass
@@ -125,15 +140,18 @@
                                         ;; more information.
                                         (map (fn [[param-id param]]
                                                [param-id (dissoc param :default)]))
-                                        (dashboard/dashboard->resolved-params dashboard))
+                                        (:resolved-params dashboard))
         request-param-id->param   (into {} (map (juxt :id identity)) request-params)
         merged-parameters         (vals (merge (dashboard-param-defaults dashboard-param-id->param card-id)
                                                request-param-id->param))]
+    (when-let [user-id api/*current-user-id*]
+      (doseq [{:keys [id value]} request-params]
+        (user-parameter-value/upsert! user-id id value)))
     (log/tracef "Dashboard parameters:\n%s\nRequest parameters:\n%s\nMerged:\n%s"
-                (u/pprint-to-str (->> dashboard-param-id->param
-                                      (m/map-vals (fn [param]
-                                                    (update param :mappings (fn [mappings]
-                                                                              (into #{} (map #(dissoc % :dashcard)) mappings)))))))
+                (u/pprint-to-str (update-vals dashboard-param-id->param
+                                              (fn [param]
+                                                (update param :mappings (fn [mappings]
+                                                                          (into #{} (map #(dissoc % :dashcard)) mappings))))))
                 (u/pprint-to-str request-param-id->param)
                 (u/pprint-to-str merged-parameters))
     (u/prog1
@@ -142,32 +160,36 @@
             merged-parameters)
       (log/tracef "Resolved =>\n%s" (u/pprint-to-str <>)))))
 
-(defn run-query-for-dashcard-async
-  "Like [[metabase.query-processor.card/run-query-for-card-async]], but runs the query for a `DashboardCard` with
-  `parameters` and `constraints`. Returns a `metabase.async.streaming_response.StreamingResponse` (see
-  [[metabase.async.streaming-response]]). Will throw an Exception if preconditions such as proper permissions are not
-  met before returning the `StreamingResponse`.
+(defn process-query-for-dashcard
+  "Like [[metabase.query-processor.card/process-query-for-card]], but runs the query for a `DashboardCard` with
+  `parameters` and `constraints`. By default, returns a `metabase.async.streaming_response.StreamingResponse` (see
+  [[metabase.async.streaming-response]]), but this may vary if you pass in a different `:run` function. Will throw an
+  Exception if preconditions such as proper permissions are not met *before* returning the `StreamingResponse`.
 
-  See [[metabase.query-processor.card/run-query-for-card-async]] for more information about the various parameters."
-  {:arglists '([& {:keys [dashboard-id card-id dashcard-id export-format parameters ignore_cache constraints parameters middleware]}])}
+  See [[metabase.query-processor.card/process-query-for-card]] for more information about the various parameters."
+  {:arglists '([& {:keys [dashboard-id card-id dashcard-id export-format parameters ignore-cache constraints parameters middleware]}])}
   [& {:keys [dashboard-id card-id dashcard-id parameters export-format]
       :or   {export-format :api}
       :as   options}]
-  ;; make sure we can read this Dashboard. Card will get read-checked later on inside
-  ;; [[qp.card/run-query-for-card-async]]
-  (api/read-check Dashboard dashboard-id)
-  (check-card-is-in-dashboard card-id dashboard-id)
-  (let [resolved-params (resolve-params-for-query dashboard-id card-id dashcard-id parameters)
-        options         (merge
-                         {:ignore_cache false
-                          :constraints  (qp.constraints/default-query-constraints)
-                          :context      :dashboard}
-                         options
-                         {:parameters   resolved-params
-                          :dashboard-id dashboard-id})]
-    (log/tracef "Running Query for Dashboard %d, Card %d, Dashcard %d with options\n%s"
-                dashboard-id card-id dashcard-id
-                (u/pprint-to-str options))
-    ;; we've already validated our parameters, so we don't need the [[qp.card]] namespace to do it again
-    (binding [qp.card/*allow-arbitrary-mbql-parameters* true]
-      (m/mapply qp.card/run-query-for-card-async card-id export-format options))))
+  (span/with-span! {:name       "run-query-for-dashcard-async"
+                    :attributes {:dashboard/id dashboard-id
+                                 :dashcard/id  dashcard-id
+                                 :card/id      card-id}}
+    ;; make sure we can read this Dashboard. Card will get read-checked later on inside
+    ;; [[qp.card/process-query-for-card]]
+    (api/read-check Dashboard dashboard-id)
+    (check-card-and-dashcard-are-in-dashboard dashboard-id card-id dashcard-id)
+    (let [resolved-params (resolve-params-for-query dashboard-id card-id dashcard-id parameters)
+          options         (merge
+                           {:ignore-cache false
+                            :constraints  (qp.constraints/default-query-constraints)
+                            :context      :dashboard}
+                           options
+                           {:parameters   resolved-params
+                            :dashboard-id dashboard-id})]
+      (log/tracef "Running Query for Dashboard %d, Card %d, Dashcard %d with options\n%s"
+                  dashboard-id card-id dashcard-id
+                  (u/pprint-to-str options))
+      ;; we've already validated our parameters, so we don't need the [[qp.card]] namespace to do it again
+      (binding [qp.card/*allow-arbitrary-mbql-parameters* true]
+        (m/mapply qp.card/process-query-for-card card-id export-format options)))))

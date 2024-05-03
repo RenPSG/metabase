@@ -1,22 +1,19 @@
 /* eslint-disable react/prop-types */
-import React, { Component } from "react";
 import PropTypes from "prop-types";
-import { t } from "ttag";
-import _ from "underscore";
-
+import { Component } from "react";
 import { connect } from "react-redux";
 import { withRouter } from "react-router";
 import { push } from "react-router-redux";
-
-import * as Urls from "metabase/lib/urls";
-
-import Collection from "metabase/entities/collections";
-import Dashboard from "metabase/entities/dashboards";
+import { t } from "ttag";
+import _ from "underscore";
 
 import ArchiveModal from "metabase/components/ArchiveModal";
+import Collection from "metabase/entities/collections";
+import Dashboards from "metabase/entities/dashboards";
+import * as Urls from "metabase/lib/urls";
 
 const mapDispatchToProps = {
-  setDashboardArchived: Dashboard.actions.setArchived,
+  setDashboardArchived: Dashboards.actions.setArchived,
   push,
 };
 
@@ -41,9 +38,14 @@ class ArchiveDashboardModal extends Component {
   };
 
   render() {
+    const { dashboard } = this.props;
     return (
       <ArchiveModal
-        title={t`Archive this dashboard?`}
+        title={
+          dashboard.is_app_age
+            ? t`Archive this page?`
+            : t`Archive this dashboard?`
+        }
         message={t`Are you sure you want to do this?`}
         onClose={this.close}
         onArchive={this.archive}
@@ -52,9 +54,9 @@ class ArchiveDashboardModal extends Component {
   }
 }
 
-export default _.compose(
+export const ArchiveDashboardModalConnected = _.compose(
   connect(null, mapDispatchToProps),
-  Dashboard.load({
+  Dashboards.load({
     id: (state, props) => Urls.extractCollectionId(props.params.slug),
   }),
   Collection.load({

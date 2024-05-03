@@ -1,13 +1,23 @@
 (ns metabase.db.connection
-  "Functions for getting the application database connection type and JDBC spec, or temporarily overriding them.
-   TODO - consider renaming this namespace `metabase.db.config`."
-  (:require [metabase.db.connection-pool-setup :as connection-pool-setup]
-            [metabase.db.env :as mdb.env]
-            [potemkin :as p]))
+  "Functions for getting the application database connection type and JDBC spec, or temporarily overriding them."
+  (:require
+   [clojure.core.async.impl.dispatch :as a.impl.dispatch]
+   [metabase.db.connection-pool-setup :as connection-pool-setup]
+   [metabase.db.env :as mdb.env]
+   [methodical.core :as methodical]
+   [potemkin :as p]
+   [toucan2.connection :as t2.conn]
+   [toucan2.jdbc.connection :as t2.jdbc.conn]
+   [toucan2.pipeline :as t2.pipeline])
+  (:import
+   (java.util.concurrent.locks ReentrantReadWriteLock)))
 
-;; Counter for [[unique-identifier]] -- this is a simple counter rather that [[java.util.UUID/randomUUID]] so we don't
-;; waste precious entropy on launch generating something that doesn't need to be random (it just needs to be unique)
-(defonce ^:private application-db-counter
+(set! *warn-on-reflection* true)
+
+(defonce ^{:doc "Counter for [[unique-identifier]] -- this is a simple counter rather that [[java.util.UUID/randomUUID]]
+  so we don't waste precious entropy on launch generating something that doesn't need to be random (it just needs to be
+  unique)"}
+  application-db-counter
   (atom 0))
 
 (p/defrecord+ ApplicationDB [^clojure.lang.Keyword db-type
@@ -18,16 +28,38 @@
                              ^clojure.lang.Atom    status
                              ;; A unique identifier generated for this specific application DB. Use this as a
                              ;; memoization/cache key. See [[unique-identifier]] for more information.
-                             id]
+                             id
+                             ;; Reentrant read-write lock for GETTING new connections. Lock doesn't track whether any
+                             ;; existing connections are open! Holding the write lock will however prevent any NEW
+                             ;; connections from being acquired.
+                             ;;
+                             ;; This is a reentrant read-write lock, which means any number of read locks are allowed at
+                             ;; the same time, but the write lock is exclusive. So if you want to prevent anyone from
+                             ;; getting new connections, lock the write lock.
+                             ;;
+                             ;; The main purpose of this is to power [[metabase.api.testing]] which allows you to reset
+                             ;; the application DB with data from a SQL dump -- during the restore process it is
+                             ;; important that we do not allow anyone to access the DB.
+                             ^ReentrantReadWriteLock lock]
   javax.sql.DataSource
   (getConnection [_]
-    (.getConnection data-source))
+    (try
+      (.. lock readLock lock)
+      (.getConnection data-source)
+      (finally
+        (.. lock readLock unlock))))
 
   (getConnection [_ user password]
-    (.getConnection data-source user password)))
+    (try
+      (.. lock readLock lock)
+      (.getConnection data-source user password)
+      (finally
+        (.. lock readLock unlock)))))
 
 (alter-meta! #'->ApplicationDB assoc :private true)
 (alter-meta! #'map->ApplicationDB assoc :private true)
+
+(def ^:private initial-db-status nil)
 
 (defn application-db
   "Create a new Metabase application database (type and [[javax.sql.DataSource]]). For use in combination
@@ -50,9 +82,10 @@
     :data-source (if create-pool?
                    (connection-pool-setup/connection-pool-data-source db-type data-source)
                    data-source)
-    :status      (atom nil)
+    :status      (atom initial-db-status)
     ;; for memoization purposes. See [[unique-identifier]] for more information.
-    :id          (swap! application-db-counter inc)}))
+    :id          (swap! application-db-counter inc)
+    :lock        (ReentrantReadWriteLock.)}))
 
 (def ^:dynamic ^ApplicationDB *application-db*
   "Type info and [[javax.sql.DataSource]] for the current Metabase application database. Create a new instance
@@ -94,13 +127,73 @@
   []
   (.id *application-db*))
 
-(defn memoize-for-application-db
-  "Like [[clojure.core/memoize]], but only memoizes for the current application database; memoized values will be
-  ignored if the app DB is dynamically rebound. For TTL memoization with [[clojure.core.memoize]], set
-  `:clojure.core.memoize/args-fn` instead; see [[metabase.driver.util/database->driver*]] for an example of how to do
-  this."
-  [f]
-  (let [f* (memoize (fn [_application-db-id & args]
-                      (apply f args)))]
-    (fn [& args]
-      (apply f* (unique-identifier) args))))
+(methodical/defmethod t2.conn/do-with-connection :default
+  [_connectable f]
+  (t2.conn/do-with-connection *application-db* f))
+
+(def ^:private ^:dynamic *transaction-depth* 0)
+
+(defn- do-transaction [^java.sql.Connection connection f]
+  (letfn [(thunk []
+            (let [savepoint (.setSavepoint connection)]
+              (try
+                (let [result (f connection)]
+                  (when (= *transaction-depth* 1)
+                    ;; top-level transaction, commit
+                    (.commit connection))
+                  result)
+                (catch Throwable e
+                  (.rollback connection savepoint)
+                  (throw e)))))]
+    ;; optimization: don't set and unset autocommit if it's already false
+    (if (.getAutoCommit connection)
+      (try
+        (.setAutoCommit connection false)
+        (thunk)
+        (finally
+          (.setAutoCommit connection true)))
+      (thunk))))
+
+(comment
+ ;; in toucan2.jdbc.connection, there is a 'defmethod' for t2.conn/do-with-transaction java.sql.Connection
+ ;; since we don't want our implementation to be overwritten, we need to require it here first before defininng ours
+ t2.jdbc.conn/keepme)
+
+(methodical/defmethod t2.conn/do-with-transaction java.sql.Connection
+  "Support nested transactions without introducing a lock like `next.jdbc` does, as that can cause deadlocks -- see
+  https://github.com/seancorfield/next-jdbc/issues/244. Use `Savepoint`s because MySQL only supports nested
+  transactions when done this way.
+
+  See also https://metaboat.slack.com/archives/CKZEMT1MJ/p1694103570500929
+
+  Note that these \"nested transactions\" are not the real thing (e.g., as in Oracle):
+    - there is only one commit, meaning that every transaction in a tree of transactions can see the changes
+      other transactions have made,
+    - in the presence of unsynchronized concurrent threads running nested transactions, the effects of rollback
+      are not well defined - a rollback will undo all work done by other transactions in the same tree that
+      started later."
+  [^java.sql.Connection connection {:keys [nested-transaction-rule] :or {nested-transaction-rule :allow} :as options} f]
+  (assert (#{:allow :ignore :prohibit} nested-transaction-rule))
+  (cond
+   (and (pos? *transaction-depth*)
+        (= nested-transaction-rule :ignore))
+   (f connection)
+
+   (and (pos? *transaction-depth*)
+        (= nested-transaction-rule :prohibit))
+   (throw (ex-info "Attempted to create nested transaction with :nested-transaction-rule set to :prohibit"
+                   {:options options}))
+
+   :else
+   (binding [*transaction-depth* (inc *transaction-depth*)]
+     (do-transaction connection f))))
+
+
+(methodical/defmethod t2.pipeline/transduce-query :before :default
+  "Make sure application database calls are not done inside core.async dispatch pool threads. This is done relatively
+  early in the pipeline so the stacktrace when this fails isn't super enormous."
+  [_rf _query-type₁ _model₂ _parsed-args resolved-query]
+  (when (a.impl.dispatch/in-dispatch-thread?)
+    (throw (ex-info "Application database calls are not allowed inside core.async dispatch pool threads."
+                    {})))
+  resolved-query)

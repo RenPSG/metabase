@@ -1,17 +1,14 @@
-import React, { useEffect, useCallback, useRef, KeyboardEvent } from "react";
-import _ from "underscore";
-
-import { Collection } from "metabase-types/api";
+import type { KeyboardEvent } from "react";
+import { forwardRef, useEffect, useCallback, useRef } from "react";
+import { usePrevious } from "react-use";
 
 import { TreeNode } from "metabase/components/tree/TreeNode";
-import { TreeNodeProps } from "metabase/components/tree/types";
-
+import type { TreeNodeProps } from "metabase/components/tree/types";
 import CollectionDropTarget from "metabase/containers/dnd/CollectionDropTarget";
-import { usePrevious } from "metabase/hooks/use-previous";
-
-import { PLUGIN_COLLECTIONS } from "metabase/plugins";
 import { getCollectionIcon } from "metabase/entities/collections";
 import * as Urls from "metabase/lib/urls";
+import { PLUGIN_COLLECTIONS } from "metabase/plugins";
+import type { Collection } from "metabase-types/api";
 
 import {
   CollectionNodeRoot,
@@ -33,7 +30,7 @@ type Props = DroppableProps &
 
 const TIME_BEFORE_EXPANDING_ON_HOVER = 600;
 
-const SidebarCollectionLink = React.forwardRef<HTMLLIElement, Props>(
+const SidebarCollectionLink = forwardRef<HTMLLIElement, Props>(
   function SidebarCollectionLink(
     {
       collection,
@@ -85,13 +82,14 @@ const SidebarCollectionLink = React.forwardRef<HTMLLIElement, Props>(
 
     const icon = getCollectionIcon(collection);
     const isRegularCollection = PLUGIN_COLLECTIONS.isRegularCollection(
-      (collection as unknown) as Collection,
+      collection as unknown as Collection,
     );
 
     return (
       <CollectionNodeRoot
         role="treeitem"
         depth={depth}
+        aria-selected={isSelected}
         isSelected={isSelected}
         hovered={isHovered}
         onClick={onToggleExpand}
@@ -116,28 +114,28 @@ const SidebarCollectionLink = React.forwardRef<HTMLLIElement, Props>(
   },
 );
 
-const DroppableSidebarCollectionLink = React.forwardRef<
-  HTMLLIElement,
-  TreeNodeProps
->(function DroppableSidebarCollectionLink(
-  { item, ...props }: TreeNodeProps,
-  ref,
-) {
-  const collection = (item as unknown) as Collection;
-  return (
-    <div data-testid="sidebar-collection-link-root">
-      <CollectionDropTarget collection={collection}>
-        {(droppableProps: DroppableProps) => (
-          <SidebarCollectionLink
-            {...props}
-            {...droppableProps}
-            collection={collection}
-            ref={ref}
-          />
-        )}
-      </CollectionDropTarget>
-    </div>
-  );
-});
+const DroppableSidebarCollectionLink = forwardRef<HTMLLIElement, TreeNodeProps>(
+  function DroppableSidebarCollectionLink(
+    { item, ...props }: TreeNodeProps,
+    ref,
+  ) {
+    const collection = item as unknown as Collection;
+    return (
+      <div data-testid="sidebar-collection-link-root">
+        <CollectionDropTarget collection={collection}>
+          {(droppableProps: DroppableProps) => (
+            <SidebarCollectionLink
+              {...props}
+              {...droppableProps}
+              collection={collection}
+              ref={ref}
+            />
+          )}
+        </CollectionDropTarget>
+      </div>
+    );
+  },
+);
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default DroppableSidebarCollectionLink;

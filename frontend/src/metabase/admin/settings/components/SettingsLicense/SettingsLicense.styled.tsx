@@ -1,4 +1,5 @@
 import styled from "@emotion/styled";
+
 import { color } from "metabase/lib/colors";
 
 export const SectionHeader = styled.h4`
@@ -24,13 +25,11 @@ export const SubHeader = styled.h4`
   margin-top: 32px;
 `;
 
-interface ExporePaidPlansContainerProps {
+interface ExplorePaidPlansContainerProps {
   justifyContent?: string;
 }
 
-export const ExporePaidPlansContainer = styled.div<
-  ExporePaidPlansContainerProps
->`
+export const ExplorePaidPlansContainer = styled.div<ExplorePaidPlansContainerProps>`
   margin: 16px 0;
   display: flex;
   align-items: flex-start;
@@ -40,7 +39,7 @@ export const ExporePaidPlansContainer = styled.div<
 
 export const SettingsLicenseContainer = styled.div`
   width: 580px;
-  padding: 16px;
+  padding: 0 16px;
 `;
 
 export const LoaderContainer = styled.div`

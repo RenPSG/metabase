@@ -1,18 +1,23 @@
-import React, { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { t } from "ttag";
 import _ from "underscore";
+
+import EntityMenu from "metabase/components/EntityMenu";
+import type { InputProps } from "metabase/core/components/Input";
+import ButtonsS from "metabase/css/components/buttons.module.css";
+import { useDebouncedValue } from "metabase/hooks/use-debounced-value";
+import { SEARCH_DEBOUNCE_DURATION } from "metabase/lib/constants";
 import { parseTimestamp } from "metabase/lib/time";
 import { getTimelineName } from "metabase/lib/timelines";
-import { SEARCH_DEBOUNCE_DURATION } from "metabase/lib/constants";
 import * as Urls from "metabase/lib/urls";
-import { useDebouncedValue } from "metabase/hooks/use-debounced-value";
-import Icon from "metabase/components/Icon";
-import EntityMenu from "metabase/components/EntityMenu";
 import ModalHeader from "metabase/timelines/common/components/ModalHeader";
-import { Timeline, TimelineEvent } from "metabase-types/api";
-import SearchEmptyState from "../SearchEmptyState";
+import type { Timeline, TimelineEvent } from "metabase-types/api";
+
+import type { MenuItem } from "../../types";
 import EventList from "../EventList";
+import SearchEmptyState from "../SearchEmptyState";
 import TimelineEmptyState from "../TimelineEmptyState";
+
 import {
   ModalBody,
   ModalRoot,
@@ -20,7 +25,6 @@ import {
   ModalToolbarInput,
   ModalToolbarLink,
 } from "./TimelineDetailsModal.styled";
-import { MenuItem } from "../../types";
 
 export interface TimelineDetailsModalProps {
   timeline: Timeline;
@@ -66,6 +70,9 @@ const TimelineDetailsModal = ({
   const canWrite = timeline.collection?.can_write;
   const canGoBack = isArchive || !isOnlyTimeline;
 
+  const handleSearchChange: InputProps["onChange"] = e =>
+    setInputText(e.target.value);
+
   return (
     <ModalRoot>
       <ModalHeader
@@ -80,14 +87,15 @@ const TimelineDetailsModal = ({
       {(isNotEmpty || isSearching) && (
         <ModalToolbar>
           <ModalToolbarInput
+            fullWidth
             value={inputText}
             placeholder={t`Search for an event`}
-            icon={<Icon name="search" />}
-            onChange={setInputText}
+            leftIcon="search"
+            onChange={handleSearchChange}
           />
           {canWrite && !isArchive && (
             <ModalToolbarLink
-              className="Button"
+              className={ButtonsS.Button}
               to={Urls.newEventInCollection(timeline)}
             >{t`Add an event`}</ModalToolbarLink>
           )}
@@ -175,4 +183,5 @@ const getMenuItems = (
   return items;
 };
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default TimelineDetailsModal;

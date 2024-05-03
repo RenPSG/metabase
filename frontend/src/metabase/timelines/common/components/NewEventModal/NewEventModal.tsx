@@ -1,25 +1,25 @@
-import React, { useCallback, useMemo } from "react";
+import moment from "moment-timezone"; // eslint-disable-line no-restricted-imports -- deprecated usage
+import { useCallback, useMemo } from "react";
 import { t } from "ttag";
-import { getDefaultTimezone } from "metabase/lib/time";
+
+import ModalContent from "metabase/components/ModalContent";
 import { getDefaultTimelineIcon } from "metabase/lib/timelines";
-import Form from "metabase/containers/Form";
-import forms from "metabase/entities/timeline-events/forms";
-import {
+import type {
   Collection,
   Timeline,
-  TimelineEvent,
+  TimelineEventData,
   TimelineEventSource,
 } from "metabase-types/api";
-import ModalBody from "../ModalBody";
-import ModalHeader from "../ModalHeader";
+
+import EventForm from "../../containers/EventForm";
 
 export interface NewEventModalProps {
   timelines?: Timeline[];
   collection?: Collection;
-  cardId?: number;
   source: TimelineEventSource;
+  cardId?: number;
   onSubmit: (
-    values: Partial<TimelineEvent>,
+    values: TimelineEventData,
     collection?: Collection,
     timeline?: Timeline,
   ) => void;
@@ -31,8 +31,8 @@ export interface NewEventModalProps {
 const NewEventModal = ({
   timelines = [],
   collection,
-  cardId,
   source,
+  cardId,
   onSubmit,
   onSubmitSuccess,
   onCancel,
@@ -42,26 +42,12 @@ const NewEventModal = ({
     return timelines.filter(t => t.collection?.can_write);
   }, [timelines]);
 
-  const form = useMemo(() => {
-    return forms.details({ timelines: availableTimelines });
-  }, [availableTimelines]);
-
   const initialValues = useMemo(() => {
-    const defaultTimeline = availableTimelines[0];
-    const hasOneTimeline = availableTimelines.length === 1;
-
-    return {
-      timeline_id: defaultTimeline ? defaultTimeline.id : null,
-      icon: hasOneTimeline ? defaultTimeline.icon : getDefaultTimelineIcon(),
-      timezone: getDefaultTimezone(),
-      source,
-      question_id: cardId,
-      time_matters: false,
-    };
-  }, [cardId, source, availableTimelines]);
+    return getInitialValues(availableTimelines, source, cardId);
+  }, [availableTimelines, source, cardId]);
 
   const handleSubmit = useCallback(
-    async (values: Partial<TimelineEvent>) => {
+    async (values: TimelineEventData) => {
       const timeline = timelines.find(t => t.id === values.timeline_id);
       await onSubmit(values, collection, timeline);
       onSubmitSuccess?.();
@@ -70,19 +56,38 @@ const NewEventModal = ({
   );
 
   return (
-    <div>
-      <ModalHeader title={t`New event`} onClose={onClose} />
-      <ModalBody>
-        <Form
-          form={form}
-          initialValues={initialValues}
-          isModal={true}
-          onSubmit={handleSubmit}
-          onClose={onCancel}
-        />
-      </ModalBody>
-    </div>
+    <ModalContent onClose={onClose} formModal title={t`New event`}>
+      <EventForm
+        initialValues={initialValues}
+        timelines={availableTimelines}
+        onSubmit={handleSubmit}
+        onCancel={onCancel}
+      />
+    </ModalContent>
   );
 };
 
+const getInitialValues = (
+  timelines: Timeline[],
+  source?: TimelineEventSource,
+  cardId?: number,
+): TimelineEventData => {
+  const defaultTimeline = timelines[0];
+  const hasOneTimeline = timelines.length === 1;
+
+  return {
+    name: "",
+    description: null,
+    timestamp: "",
+    timeline_id: defaultTimeline?.id,
+    icon: hasOneTimeline ? defaultTimeline.icon : getDefaultTimelineIcon(),
+    timezone: moment.tz.guess(),
+    time_matters: false,
+    archived: false,
+    source,
+    question_id: cardId,
+  };
+};
+
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default NewEventModal;

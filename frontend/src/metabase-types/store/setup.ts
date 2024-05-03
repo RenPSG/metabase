@@ -1,11 +1,14 @@
+import type { SetupStep } from "metabase/setup/types";
+import type { DatabaseData, UsageReason } from "metabase-types/api";
+
 export interface Locale {
   name: string;
   code: string;
 }
 
 export interface UserInfo {
-  first_name: string;
-  last_name: string;
+  first_name: string | null;
+  last_name: string | null;
   email: string;
   site_name: string;
   password: string;
@@ -13,19 +16,9 @@ export interface UserInfo {
 }
 
 export interface InviteInfo {
-  first_name: string;
-  last_name: string;
+  first_name: string | null;
+  last_name: string | null;
   email: string;
-}
-
-export interface DatabaseInfo {
-  name: string;
-  engine: string;
-  details: DatabaseDetails;
-}
-
-export interface DatabaseDetails {
-  ssl: boolean;
 }
 
 export interface SubscribeInfo {
@@ -33,12 +26,14 @@ export interface SubscribeInfo {
 }
 
 export interface SetupState {
-  step: number;
+  step: SetupStep;
   locale?: Locale;
   user?: UserInfo;
+  usageReason?: UsageReason;
   databaseEngine?: string;
-  database?: DatabaseInfo;
+  database?: DatabaseData;
   invite?: InviteInfo;
   isLocaleLoaded: boolean;
   isTrackingAllowed: boolean;
+  licenseToken?: string | null;
 }

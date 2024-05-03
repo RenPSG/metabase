@@ -1,25 +1,29 @@
 (ns metabase.pulse.render.body
-  (:require [cheshire.core :as json]
-            [clojure.string :as str]
-            [hiccup.core :refer [h]]
-            [medley.core :as m]
-            [metabase.public-settings :as public-settings]
-            [metabase.pulse.render.color :as color]
-            [metabase.pulse.render.common :as common]
-            [metabase.pulse.render.datetime :as datetime]
-            [metabase.pulse.render.image-bundle :as image-bundle]
-            [metabase.pulse.render.js-svg :as js-svg]
-            [metabase.pulse.render.sparkline :as sparkline]
-            [metabase.pulse.render.style :as style]
-            [metabase.pulse.render.table :as table]
-            [metabase.pulse.util :as pu]
-            [metabase.shared.models.visualization-settings :as mb.viz]
-            [metabase.types :as types]
-            [metabase.util :as u]
-            [metabase.util.i18n :refer [trs tru]]
-            [metabase.util.ui-logic :as ui-logic]
-            [schema.core :as s])
-  (:import [java.text DecimalFormat DecimalFormatSymbols]))
+  (:require
+   [clojure.string :as str]
+   [hiccup.core :refer [h]]
+   [medley.core :as m]
+   [metabase.formatter :as formatter]
+   [metabase.formatter.datetime :as datetime]
+   [metabase.models.timeline-event :as timeline-event]
+   [metabase.public-settings :as public-settings]
+   [metabase.pulse.render.color :as color]
+   [metabase.pulse.render.image-bundle :as image-bundle]
+   [metabase.pulse.render.js-svg :as js-svg]
+   [metabase.pulse.render.style :as style]
+   [metabase.pulse.render.table :as table]
+   [metabase.pulse.util :as pu]
+   [metabase.query-processor.streaming :as qp.streaming]
+   [metabase.shared.models.visualization-settings :as mb.viz]
+   [metabase.types :as types]
+   [metabase.util :as u]
+   [metabase.util.i18n :refer [trs tru]]
+   [metabase.util.malli :as mu]
+   [toucan2.core :as t2])
+  (:import
+   (java.text DecimalFormat DecimalFormatSymbols)))
+
+(set! *warn-on-reflection* true)
 
 (def ^:private card-error-rendered-info
   "Default rendered-info map when there is an error running a card on the card run.
@@ -49,10 +53,6 @@
                           :padding     :16px})}
            (trs "An error occurred while displaying this card.")]}))
 
-(def rows-limit
-  "Maximum number of rows to render in a Pulse image."
-  10)
-
 ;; NOTE: hiccup does not escape content by default so be sure to use "h" to escape any user-controlled content :-/
 
 ;;; +----------------------------------------------------------------------------------------------------------------+
@@ -67,39 +67,19 @@
 
 ;;; --------------------------------------------------- Formatting ---------------------------------------------------
 
-(s/defn ^:private format-cell
-  [timezone-id :- (s/maybe s/Str) value col visualization-settings]
+(mu/defn ^:private format-cell
+  [timezone-id :- [:maybe :string] value col visualization-settings]
   (cond
     (types/temporal-field? col)
     (datetime/format-temporal-str timezone-id value col)
 
     (number? value)
-    (common/format-number value col visualization-settings)
+    (formatter/format-number value col visualization-settings)
 
     :else
     (str value)))
 
-(s/defn ^:private get-format
-  [timezone-id :- (s/maybe s/Str) col visualization-settings]
-  (cond
-    ;; for numbers, return a format function that has already computed the differences.
-    ;; todo: do the same for temporal strings
-    (types/temporal-field? col)
-    #(datetime/format-temporal-str timezone-id % col)
-
-    ;; todo integer columns with a unit
-    (or (isa? (:effective_type col) :type/Number)
-        (isa? (:base_type col) :type/Number))
-    (common/number-formatter col visualization-settings)
-
-    :else
-    str))
-
 ;;; --------------------------------------------------- Rendering ----------------------------------------------------
-
-(def ^:dynamic *render-img-fn*
-  "The function that should be used for rendering image bytes. Defaults to `render-img-data-uri`."
-  image-bundle/render-img-data-uri)
 
 (defn- create-remapping-lookup
   "Creates a map with from column names to a column index. This is used to figure out what a given column name or value
@@ -113,11 +93,14 @@
 (defn- column-name
   "Returns first column name from a hierarchy of possible column names"
   [card col]
-  (let [column-settings (some->> (get-in card [:visualization_settings :column_settings])
-                                 (m/map-keys (comp vec json/parse-string name)))]
-    (name (or (when-let [fr (:field_ref col)]
-                (get-in column-settings [["ref" (mapv #(if (keyword? %) (name %) %) fr)] :column_title]))
-              (get-in column-settings [["name" (:name col)] :column_title])
+  (let [col-settings (-> (mb.viz/db->norm (:visualization_settings card))
+                         ::mb.viz/column-settings
+                         ;; field-ref keys can come in with additional stuff like :meta-data or unit maps,
+                         ;; so we select only those keys we CAN use to match with by using select-keys
+                         (update-keys #(select-keys % [::mb.viz/column-name ::mb.viz/field-id])))]
+    (name (or (when-let [[_ id] (:field_ref col)]
+                (get-in col-settings [{::mb.viz/field-id id} ::mb.viz/column-title]))
+              (get-in col-settings [{::mb.viz/column-name (:name col)} ::mb.viz/column-title])
               (:display_name col)
               (:name col)))))
 
@@ -134,7 +117,7 @@
                     ;; in the output and should be skipped
                     :when              (not (:remapped_from maybe-remapped-col))]
                 (if (isa? ((some-fn :effective_type :base_type) col) :type/Number)
-                  (common/->NumericWrapper col-name)
+                  (formatter/map->NumericWrapper {:num-str col-name :num-value col-name})
                   col-name))
    :bar-width (when include-bar? 99)})
 
@@ -147,10 +130,17 @@
        100)
     (- max-value min-value))))
 
-(s/defn ^:private query-results->row-seq
+(mu/defn ^:private query-results->row-seq
   "Returns a seq of stringified formatted rows that can be rendered into HTML"
-  [timezone-id :- (s/maybe s/Str) remapping-lookup cols rows viz-settings {:keys [bar-column min-value max-value]}]
-  (let [formatters (into [] (map #(get-format timezone-id % viz-settings)) cols)]
+  [timezone-id :- [:maybe :string]
+   remapping-lookup
+   cols
+   rows
+   viz-settings
+   {:keys [bar-column min-value max-value]}]
+  (let [formatters (into []
+                         (map #(formatter/create-formatter timezone-id % viz-settings))
+                         cols)]
     (for [row rows]
       {:bar-width (some-> (and bar-column (bar-column row))
                           (normalize-bar-value min-value max-value))
@@ -164,23 +154,31 @@
                                                 [fmt-fn maybe-remapped-row-cell])]]
               (fmt-fn row-cell))})))
 
-(s/defn ^:private prep-for-html-rendering
+(mu/defn ^:private prep-for-html-rendering
   "Convert the query results (`cols` and `rows`) into a formatted seq of rows (list of strings) that can be rendered as
   HTML"
-  ([timezone-id :- (s/maybe s/Str) card data]
+  ([timezone-id :- [:maybe :string]
+    card
+    data]
    (prep-for-html-rendering timezone-id card data {}))
-  ([timezone-id :- (s/maybe s/Str) card {:keys [cols rows viz-settings]}
+
+  ([timezone-id :- [:maybe :string]
+    card
+    {:keys [cols rows viz-settings], :as _data}
     {:keys [bar-column] :as data-attributes}]
    (let [remapping-lookup (create-remapping-lookup cols)]
      (cons
       (query-results->header-row remapping-lookup card cols bar-column)
-      (query-results->row-seq timezone-id remapping-lookup cols
-                              (take rows-limit rows)
-                              viz-settings
-                              data-attributes)))))
+      (query-results->row-seq
+       timezone-id
+       remapping-lookup
+       cols
+       (take (min (public-settings/attachment-table-row-limit) 100) rows)
+       viz-settings
+       data-attributes)))))
 
 (defn- strong-limit-text [number]
-  [:strong {:style (style/style {:color style/color-gray-3})} (h (common/format-number number))])
+  [:strong {:style (style/style {:color style/color-gray-3})} (h (formatter/format-number number))])
 
 (defn- render-truncation-warning
   [row-limit row-count]
@@ -193,15 +191,14 @@
         " of "     (strong-limit-text row-count)
         " rows."]])))
 
-(defn- attached-results-text
+(defn attached-results-text
   "Returns hiccup structures to indicate truncated results are available as an attachment"
-  [render-type rows rows-limit]
+  [render-type {:keys [include_csv include_xls]}]
   (when (and (not= :inline render-type)
-             (< rows-limit (count rows)))
+             (or include_csv include_xls))
     [:div {:style (style/style {:color         style/color-gray-2
                                 :margin-bottom :16px})}
-     (trs "More results have been included as a file attachment")]))
-
+     (trs "Results have been included as a file attachment")]))
 
 ;;; +----------------------------------------------------------------------------------------------------------------+
 ;;; |                                                     render                                                     |
@@ -210,30 +207,49 @@
 (defmulti render
   "Render a Pulse as `chart-type` (e.g. `:bar`, `:scalar`, etc.) and `render-type` (either `:inline` or `:attachment`)."
   {:arglists '([chart-type render-type timezone-id card dashcard data])}
-  (fn [chart-type _ _ _ _ _] chart-type))
+  (fn [chart-type _render-type _timezone-id _card _dashcard _data]
+    chart-type))
 
-(s/defmethod render :table :- common/RenderedPulseCard
-  [_ render-type timezone-id :- (s/maybe s/Str) card _ {:keys [rows] :as data}]
-  (let [table-body [:div
-                    (table/render-table
-                     (color/make-color-selector data (:visualization_settings card))
-                     (mapv :name (:cols data))
-                     (prep-for-html-rendering timezone-id card data))
-                    (render-truncation-warning rows-limit (count rows))]]
+(defn- order-data [data viz-settings]
+  (if (some? (::mb.viz/table-columns viz-settings))
+    (let [[ordered-cols output-order] (qp.streaming/order-cols (:cols data) viz-settings)
+          keep-filtered-idx           (fn [row] (if output-order
+                                                  (let [row-v (into [] row)]
+                                                    (for [i output-order] (row-v i)))
+                                                  row))
+          ordered-rows                (map keep-filtered-idx (:rows data))]
+      [ordered-cols ordered-rows])
+    [(:cols data) (:rows data)]))
+
+(mu/defmethod render :table :- formatter/RenderedPulseCard
+  [_chart-type
+   _render-type
+   timezone-id :- [:maybe :string]
+   card
+   _dashcard
+   {:keys [rows viz-settings] :as data}]
+  (let [[ordered-cols ordered-rows] (order-data data viz-settings)
+        data                        (-> data
+                                        (assoc :rows ordered-rows)
+                                        (assoc :cols ordered-cols))
+        table-body                  [:div
+                                     (table/render-table
+                                      (color/make-color-selector data viz-settings)
+                                      (mapv :name ordered-cols)
+                                      (prep-for-html-rendering timezone-id card data))
+                                     (render-truncation-warning (public-settings/attachment-table-row-limit) (count rows))]]
     {:attachments
      nil
 
      :content
-     (if-let [results-attached (attached-results-text render-type rows rows-limit)]
-       (list results-attached table-body)
-       (list table-body))}))
+     table-body}))
 
 (def ^:private default-date-styles
   {:year "YYYY"
    :quarter "[Q]Q - YYYY"
    :minute-of-hour "m"
    :day-of-week "dddd"
-   :day-of-month "D"
+   :day-of-month "d"
    :day-of-year "DDD"
    :week-of-year "wo"
    :month-of-year "MMMM"
@@ -246,15 +262,22 @@
                :quarter "YYYY - [Q]Q"}
    "MMMM D, YYYY" {:month "MMMM, YYYY"}
    "D MMMM, YYYY" {:month "MMMM, YYYY"}
-   "dddd, MMMM D, YYYY" {:week "MMMM D, YYYY"
+   "dddd, MMMM D, YYYY" {:day "EEEE, MMMM d, YYYY"
+                         :week "MMMM d, YYYY"
                          :month "MMMM, YYYY"}})
 
 (defn- update-date-style
-  [date-style unit]
+  [date-style unit {::mb.viz/keys [date-abbreviate date-separator]}]
   (let [unit (or unit :default)]
-    (or (get-in override-date-styles [date-style unit])
-        (get-in default-date-styles [unit])
-        date-style)))
+    (cond-> (or (get-in override-date-styles [date-style unit])
+                (get default-date-styles unit)
+                date-style)
+      date-separator
+      (str/replace #"/" date-separator)
+
+      date-abbreviate
+      (-> (str/replace #"MMMM" "MMM")
+          (str/replace #"EEEE" "E")))))
 
 (defn- backfill-currency
   [{:keys [number_style currency] :as settings}]
@@ -262,16 +285,17 @@
     (and (= number_style "currency") (nil? currency))
     (assoc :currency "USD")))
 
-(defn- settings-from-column
-  [col column-settings]
-  (or (get column-settings {::mb.viz/field-id (:id col)})
-      (get column-settings {::mb.viz/column-name (:name col)})))
-
 (defn- update-col-for-js
   [col-settings col]
   (-> (m/map-keys (fn [k] (-> k name (str/replace #"-" "_") keyword)) col-settings)
       (backfill-currency)
-      (u/update-if-exists :date_style update-date-style (:unit col))))
+      (u/update-if-exists :date_style update-date-style (:unit col) col-settings)))
+
+(defn- settings-from-column
+  [col column-settings]
+  (-> (or (get column-settings {::mb.viz/field-id (:id col)})
+          (get column-settings {::mb.viz/column-name (:name col)}))
+      (update-col-for-js col)))
 
 (defn- ->js-viz
   "Include viz settings for js.
@@ -279,84 +303,15 @@
   - there are some date overrides done from lib/formatting.js
   - chop off and underscore the nasty keys in our map
   - backfill currency to the default of USD if not present"
-  [x-col y-col {::mb.viz/keys [column-settings] :as _viz-settings}]
+  [x-col y-col {::mb.viz/keys [column-settings] :as viz-settings}]
   (let [x-col-settings (settings-from-column x-col column-settings)
         y-col-settings (settings-from-column y-col column-settings)]
-    (cond-> {:colors (public-settings/application-colors)}
+    (cond-> {:colors (public-settings/application-colors)
+             :visualization_settings (or viz-settings {})}
       x-col-settings
-      (assoc :x (update-col-for-js x-col-settings x-col))
+      (assoc :x x-col-settings)
       y-col-settings
-      (assoc :y (update-col-for-js y-col-settings y-col)))))
-
-(defn- ->ts-viz
-  "Include viz settings for the typed settings, initially in XY charts.
-  These are actually completely different than the previous settings format inasmuch:
-  1. The labels are in the settings
-  2. Colors are in the series, only the whitelabel colors are here
-  3. Many fewer things are optional
-  4. Must explicitly have yAxisPosition in all the series
-
-  For further details look at frontend/src/metabase/static-viz/XYChart/types.ts"
-  [x-col y-col labels {::mb.viz/keys [column-settings] :as viz-settings}]
-  (let [default-format {:number_style "decimal"
-                        :currency "USD"
-                        :currency_style "symbol"}
-        x-col-settings (or (settings-from-column x-col column-settings) {})
-        y-col-settings (or (settings-from-column y-col column-settings) {})
-        x-format       (merge
-                         (if (isa? (:effective_type x-col) :type/Temporal)
-                           {:date_style "MMMM D, YYYY"}
-                           default-format)
-                         x-col-settings)
-        y-format       (merge
-                         default-format
-                         y-col-settings)
-        default-x-type (if (isa? (:effective_type x-col) :type/Temporal)
-                         "timeseries"
-                         "ordinal")]
-    {:colors   (public-settings/application-colors)
-     :stacking (if (:stackable.stack_type viz-settings) "stack" "none")
-     :x        {:type (or (:graph.x_axis.scale viz-settings) default-x-type)
-                :format x-format}
-     :y        {:type (or (:graph.y_axis.scale viz-settings) "linear")
-                :format y-format}
-     :labels   labels}))
-
-(defn- set-default-stacked
-  "Default stack type is stacked for area chart with more than one metric.
-   So, if :stackable.stack_type is not specified, it's stacked.
-   However, if key is explicitly set in :stackable.stack_type and is nil, that indicates not stacked."
-  [viz-settings card]
-  (let [stacked     (if (contains? viz-settings :stackable.stack_type)
-                      (= (:stackable.stack_type viz-settings) "stacked")
-                      (and
-                        (= (:display card) :area)
-                        (> (count (:graph.metrics viz-settings)) 1)))]
-    (if stacked
-      (assoc viz-settings :stackable.stack_type "stacked")
-      viz-settings)))
-
-(defn- x-and-y-axis-label-info
-  "Generate the X and Y axis labels passed in as the `labels` argument
-  to [[metabase.pulse.render.js-svg/timelineseries-bar]] and other similar functions for rendering charts with X and Y
-  axes. Respects custom display names in `viz-settings`; otherwise uses `x-col` and `y-col` display names."
-  [x-col y-col viz-settings]
-  {:bottom (or (:graph.x_axis.title_text viz-settings)
-               (:display_name x-col))
-   :left   (or (:graph.y_axis.title_text viz-settings)
-               (:display_name y-col))})
-
-(defn- combo-label-info
-  "X and Y axis labels passed into the `labels` argument needs to be different
-  for combos specifically (as opposed to multiples)"
-  [x-cols y-cols viz-settings]
-  {:bottom (or (:graph.x_axis.title_text viz-settings)
-               (:display_name (first x-cols)))
-   :left   (or (:graph.y_axis.title_text viz-settings)
-               (:display_name (first y-cols)))
-   :right  (or (:graph.y_axis.title_text viz-settings)
-               (:display_name (second y-cols))
-               "")})
+      (assoc :y y-col-settings))))
 
 (def ^:private colors
   "Colors to cycle through for charts. These are copied from https://stats.metabase.com/_internal/colors"
@@ -396,18 +351,63 @@
                                    (tru "N/A")
                                    (format-percentage (/ value total)))]))}))
 
-(s/defmethod render :categorical/donut :- common/RenderedPulseCard
-  [_ render-type _timezone-id :- (s/maybe s/Str) card _ {:keys [rows] :as data}]
-  (let [[x-axis-rowfn y-axis-rowfn] (common/graphing-column-row-fns card data)
+(defn- donut-legend
+  [legend-entries]
+  (letfn [(table-fn [entries]
+            (into [:table {:style (style/style {:color       "#4C5773"
+                                                :font-family "Lato, sans-serif"
+                                                :font-size   "24px"
+                                                :font-weight "bold"
+                                                :box-sizing  "border-box"
+                                                :white-space "nowrap"})}]
+                  (for [{:keys [label percentage color]} entries]
+                    [:tr {:style (style/style {:margin-right "12px"})}
+                     [:td {:style (style/style {:color         color
+                                                :padding-right "7px"
+                                                :line-height   "0"})}
+                      [:span {:style (style/style {:font-size   "2.875rem"
+                                                   :line-height "0"
+                                                   :position    "relative"
+                                                   :top         "-4px"})} "•"]]
+                     [:td {:style (style/style {:padding-right "30px"})}
+                      label]
+                     [:td percentage]])))]
+    (if (< (count legend-entries) 8)
+      (table-fn legend-entries)
+      [:table (into [:tr]
+                    (map (fn [some-entries]
+                           [:td {:style (style/style {:padding-right  "20px"
+                                                      :vertical-align "top"})}
+                            (table-fn some-entries)])
+                         (split-at (/ (count legend-entries) 2) legend-entries)))])))
+
+(defn- replace-nils [rows]
+  (mapv (fn [row]
+          (if (nil? (first row))
+            (assoc row 0 "(empty)")
+            row))
+        rows))
+
+(mu/defmethod render :categorical/donut :- formatter/RenderedPulseCard
+  [_chart-type
+   render-type
+   timezone-id :- [:maybe :string]
+   card
+   _dashcard
+   {:keys [rows cols viz-settings] :as data}]
+  (let [[x-axis-rowfn y-axis-rowfn] (formatter/graphing-column-row-fns card data)
         rows                        (map (juxt (comp str x-axis-rowfn) y-axis-rowfn)
-                                         (common/row-preprocess x-axis-rowfn y-axis-rowfn rows))
-        slice-threshold             (or (get-in card [:visualization_settings :pie.slice_threshold])
+                                         (formatter/row-preprocess x-axis-rowfn y-axis-rowfn (replace-nils rows)))
+        slice-threshold             (or (get viz-settings :pie.slice_threshold)
                                         2.5)
         {:keys [rows percentages]}  (donut-info slice-threshold rows)
-        legend-colors               (zipmap (map first rows) (cycle colors))
+        legend-colors               (merge (zipmap (map first rows) (cycle colors))
+                                           (update-keys (:pie.colors viz-settings) name))
+        settings                    {:percent_visibility (:pie.percent_visibility viz-settings) :show_total (:pie.show_total viz-settings)}
         image-bundle                (image-bundle/make-image-bundle
                                      render-type
-                                     (js-svg/categorical-donut rows legend-colors))]
+                                     (js-svg/categorical-donut rows legend-colors settings))
+        {label-viz-settings :x}     (->js-viz (x-axis-rowfn cols) (y-axis-rowfn cols) viz-settings)]
     {:attachments
      (when image-bundle
        (image-bundle/image-bundle->attachment image-bundle))
@@ -416,27 +416,34 @@
      [:div
       [:img {:style (style/style {:display :block :width :100%})
              :src   (:image-src image-bundle)}]
-      (into [:div {:style (style/style {:clear :both :width "540px" :color "#4C5773"})}]
-            (for [label (map first rows)]
-              [:div {:style (style/style {:float       :left :margin-right "12px"
-                                          :font-family "Lato, sans-serif"
-                                          :font-size   "16px"})}
-               [:span {:style (style/style {:color (legend-colors label)})}
-                "•"]
-               [:span {:style (style/style {:margin-left "6px"})}
-                label]
-               [:span {:style (style/style {:margin-left "6px"})}
-                (percentages label)]]))]}))
+      (donut-legend
+       (mapv (fn [row]
+               (let [label (first row)]
+                 {:percentage (percentages (first row))
+                  :color      (legend-colors (first row))
+                  :label      (if (and (contains? label-viz-settings :date_style)
+                                       (datetime/temporal-string? label))
+                                (datetime/format-temporal-str
+                                 timezone-id
+                                 (first row)
+                                 (x-axis-rowfn cols)
+                                 viz-settings)
+                                label)}))
+             rows))]}))
 
-(s/defmethod render :progress :- common/RenderedPulseCard
-  [_ render-type _timezone-id _card _ {:keys [cols rows viz-settings] :as _data}]
+(mu/defmethod render :progress :- formatter/RenderedPulseCard
+  [_chart-type
+   render-type
+   _timezone-id
+   _card
+   _dashcard
+   {:keys [cols rows viz-settings] :as _data}]
   (let [value        (ffirst rows)
         goal         (:progress.goal viz-settings)
-        ;; See issue #19248 on GH for why it's the second color
-        color        (or (:progress.color viz-settings) (second colors))
+        color        (:progress.color viz-settings)
         settings     (assoc
-                       (->js-viz (first cols) (first cols) viz-settings)
-                       :color color)
+                      (->js-viz (first cols) (first cols) viz-settings)
+                      :color color)
         ;; ->js-viz fills in our :x but we actually want that under :format key
         settings     (assoc settings :format (:x settings))
         image-bundle (image-bundle/make-image-bundle
@@ -451,177 +458,44 @@
       [:img {:style (style/style {:display :block :width :100%})
              :src   (:image-src image-bundle)}]]}))
 
-(defn default-y-pos
-  "Default positions of the y-axes of multiple and combo graphs.
-  You kind of hope there's only two but here's for the eventuality"
-  [viz-settings]
-  (if (:stackable.stack_type viz-settings)
-    (repeat "left")
-    (conj (repeat "right")
-          "left")))
+(defn dashcard-timeline-events
+  "Look for a timeline and corresponding events associated with this dashcard."
+  [{{:keys [collection_id] :as _card} :card}]
+  (let [timelines (t2/select :model/Timeline
+                             :collection_id collection_id
+                             :archived false)]
+    (->> (t2/hydrate timelines :creator [:collection :can_write])
+         (map #(timeline-event/include-events-singular % {:events/all? true})))))
 
-(def default-combo-chart-types
-  "Default chart type seq of combo graphs (not multiple graphs)."
-  (conj (repeat "bar")
-        "line"))
+(defn- add-dashcard-timeline-events
+  "If there's a timeline associated with this card, add its events in."
+  [card-with-data]
+  (if-some [timeline-events (seq (dashcard-timeline-events card-with-data))]
+    (assoc card-with-data :timeline_events timeline-events)
+    card-with-data))
 
-(defn- join-series
-  [names colors types row-seqs y-axis-positions]
-  ;;; gotta flatten i guess
-  (let [joined (map vector names colors types row-seqs y-axis-positions)]
-    (vec (for [[card-name card-color card-type rows y-axis-position] joined]
-           {:name          card-name
-            :color         card-color
-            :type          card-type
-            :data          rows
-            :yAxisPosition y-axis-position}))))
+(mu/defmethod render :gauge :- formatter/RenderedPulseCard
+  [_chart-type render-type _timezone-id :- [:maybe :string] card _dashcard data]
+  (let [image-bundle (image-bundle/make-image-bundle
+                      render-type
+                      (js-svg/gauge card data))]
+    {:attachments
+     (when image-bundle
+       (image-bundle/image-bundle->attachment image-bundle))
 
+     :content
+     [:div
+      [:img {:style (style/style {:display :block :width :100%})
+             :src   (:image-src image-bundle)}]]}))
 
-(s/defmethod render :multiple
-  [_ render-type _timezone-id card dashcard {:keys [viz-settings] :as data}]
-  (let [multi-res     (pu/execute-multi-card card dashcard)
-        ;; multi-res gets the other results from the set of multis.
-        ;; we shove cards and data here all together below for uniformity's sake
-        viz-settings  (set-default-stacked viz-settings card)
-        cards         (cons card (map :card multi-res))
-        multi-data    (cons data (map #(get-in % [:result :data]) multi-res))
-        rowfns        (mapv common/graphing-column-row-fns cards multi-data)
-        row-seqs      (map :rows multi-data)
-        row-seqs      (for [[row-seq rowfnpair] (map vector row-seqs rowfns)]
-                        (let [[x-rowfn y-rowfn] rowfnpair]
-                          (map (juxt x-rowfn y-rowfn)
-                               (common/row-preprocess x-rowfn y-rowfn row-seq))))
-        col-seqs      (map :cols multi-data)
-        first-rowfns  (first rowfns)
-        [x-col y-col] ((juxt (first first-rowfns) (second first-rowfns)) (first col-seqs))
-        labels        (x-and-y-axis-label-info x-col y-col viz-settings)
-        names         (map :name cards)
-        colors        (take (count multi-data) colors)
-        types         (map :display cards)
-        settings      (->ts-viz x-col y-col labels viz-settings)
-        y-pos         (take (count names) (default-y-pos viz-settings))
-        series        (join-series names colors types row-seqs y-pos)
-        image-bundle  (image-bundle/make-image-bundle
+(mu/defmethod render :row :- formatter/RenderedPulseCard
+  [_chart-type render-type _timezone-id card _dashcard {:keys [rows cols] :as _data}]
+  (let [viz-settings (get card :visualization_settings)
+        data {:rows rows
+              :cols cols}
+        image-bundle   (image-bundle/make-image-bundle
                         render-type
-                        (js-svg/combo-chart series settings))]
-   {:attachments
-    (when image-bundle
-      (image-bundle/image-bundle->attachment image-bundle))
-
-    :content
-    [:div
-     [:img {:style (style/style {:display :block
-                                 :width   :100%})
-            :src   (:image-src image-bundle)}]]}))
-
-(defn- series-setting [viz-settings inner-key outer-key]
-  (get-in viz-settings [:series_settings (keyword outer-key) inner-key]))
-
-(defn- single-x-axis-combo-series
-  "This munges rows and columns into series in the format that we want for combo staticviz for literal combo displaytype,
-  for a single x-axis with multiple y-axis."
-  [chart-type joined-rows _x-cols y-cols viz-settings]
-  (for [[idx y-col] (map-indexed vector y-cols)]
-    (let [y-col-key     (keyword (:name y-col))
-          card-name     (or (series-setting viz-settings y-col-key :name)
-                            (:display_name y-col))
-          card-color    (or (series-setting viz-settings y-col-key :color)
-                            (nth colors idx))
-          card-type     (or (series-setting viz-settings y-col-key :display)
-                            chart-type
-                            (nth default-combo-chart-types idx))
-          selected-rows (sort-by first (map #(vector (ffirst %) (nth (second %) idx)) joined-rows))
-          y-axis-pos    (or (series-setting viz-settings y-col-key :axis)
-                            (nth (default-y-pos viz-settings) idx))]
-     {:name          card-name
-      :color         card-color
-      :type          card-type
-      :data          selected-rows
-      :yAxisPosition y-axis-pos})))
-
-(defn- double-x-axis-combo-series
-  "This munges rows and columns into series in the format that we want for combo staticviz for literal combo displaytype,
-  for a double x-axis, which has pretty materially different semantics for that second dimension, with single y-axis only.
-
-  This mimics default behavior in JS viz, which is to group by the second dimension and make every group-by-value a series.
-  This can have really high cardinality of series but the JS viz will complain about more than 100 already"
-  [chart-type joined-rows _x-cols _y-cols viz-settings]
-  (let [grouped-rows (group-by #(second (first %)) joined-rows)
-        groups       (keys grouped-rows)]
-    (for [[idx group-key] (map-indexed vector groups)]
-      (let [row-group          (get grouped-rows group-key)
-            selected-row-group (sort-by first (map #(vector (ffirst %) (first (second %))) row-group))
-            card-name          (or (series-setting viz-settings group-key :name)
-                                   group-key)
-            card-color         (or (series-setting viz-settings group-key :color)
-                                   (nth colors idx))
-            card-type          (or (series-setting viz-settings group-key :display)
-                                   chart-type
-                                   (nth default-combo-chart-types idx))
-            y-axis-pos         (or (series-setting viz-settings group-key :axis)
-                                   (nth (default-y-pos viz-settings) idx))]
-        {:name          card-name
-         :color         card-color
-         :type          card-type
-         :data          selected-row-group
-         :yAxisPosition y-axis-pos}))))
-
-(defn- lab-image-bundle
-  "Generate an image-bundle for a Line Area Bar chart (LAB)
-
-  Use the combo charts for every chart-type in line area bar because we get multiple chart series for cheaper this way."
-  [chart-type render-type _timezone-id card _dashcard {:keys [cols rows viz-settings] :as data}]
-  (let [x-axis-rowfn     (ui-logic/mult-x-axis-rowfn card data)
-        y-axis-rowfn     (ui-logic/mult-y-axis-rowfn card data)
-        x-rows           (filter some? (map x-axis-rowfn rows))
-        y-rows           (filter some? (map y-axis-rowfn rows))
-        joined-rows      (map vector x-rows y-rows)
-        viz-settings     (set-default-stacked viz-settings card)
-        [x-cols y-cols]  ((juxt x-axis-rowfn y-axis-rowfn) (vec cols))
-
-        enforced-type    (if (= chart-type :combo)
-                           nil
-                           chart-type)
-        ;; NB: There's a hardcoded limit of arity 2 on x-axis, so there's only the 1-axis or 2-axis case
-        series           (if (= (count x-cols) 1)
-                           (single-x-axis-combo-series enforced-type joined-rows x-cols y-cols viz-settings)
-                           (double-x-axis-combo-series enforced-type joined-rows x-cols y-cols viz-settings))
-
-        labels           (combo-label-info x-cols y-cols viz-settings)
-        settings         (->ts-viz (first x-cols) (first y-cols) labels viz-settings)]
-    (image-bundle/make-image-bundle
-      render-type
-      (js-svg/combo-chart series settings))))
-
-(s/defmethod render :line :- common/RenderedPulseCard
-  [_ render-type timezone-id card _dashcard data]
-  (let [image-bundle     (lab-image-bundle :line render-type timezone-id card _dashcard data)]
-    {:attachments
-     (when image-bundle
-       (image-bundle/image-bundle->attachment image-bundle))
-
-     :content
-     [:div
-      [:img {:style (style/style {:display :block
-                                  :width   :100%})
-             :src   (:image-src image-bundle)}]]}))
-
-(s/defmethod render :area :- common/RenderedPulseCard
-  [_ render-type timezone-id card _dashcard data]
-  (let [image-bundle     (lab-image-bundle :area render-type timezone-id card _dashcard data)]
-    {:attachments
-     (when image-bundle
-       (image-bundle/image-bundle->attachment image-bundle))
-
-     :content
-     [:div
-      [:img {:style (style/style {:display :block
-                                  :width   :100%})
-             :src   (:image-src image-bundle)}]]}))
-
-(s/defmethod render :bar :- common/RenderedPulseCard
-  [_ render-type _timezone-id :- (s/maybe s/Str) card _dashcard data]
-  (let [image-bundle (lab-image-bundle :bar render-type _timezone-id card _dashcard data)]
+                        (js-svg/row-chart viz-settings data))]
     {:attachments
      (when image-bundle
        (image-bundle/image-bundle->attachment image-bundle))
@@ -631,21 +505,22 @@
       [:img {:style (style/style {:display :block :width :100%})
              :src   (:image-src image-bundle)}]]}))
 
-(s/defmethod render :combo :- common/RenderedPulseCard
-  [_ render-type _timezone-id :- (s/maybe s/Str) card _dashcard data]
-  (let [image-bundle (lab-image-bundle :combo render-type _timezone-id card _dashcard data)]
-    {:attachments
-     (when image-bundle
-       (image-bundle/image-bundle->attachment image-bundle))
+(defn- get-col-by-name
+    [cols col-name]
+    (->> (map-indexed (fn [idx m] [idx m]) cols)
+         (some (fn [[idx col]]
+                 (when (= col-name (:name col))
+                   [idx col])))))
 
-     :content
-     [:div
-      [:img {:style (style/style {:display :block :width :100%})
-             :src   (:image-src image-bundle)}]]}))
-
-(s/defmethod render :scalar :- common/RenderedPulseCard
-  [_ _ timezone-id _card _ {:keys [cols rows viz-settings]}]
-  (let [value (format-cell timezone-id (ffirst rows) (first cols) viz-settings)]
+(mu/defmethod render :scalar :- formatter/RenderedPulseCard
+  [_chart-type _render-type timezone-id _card _dashcard {:keys [cols rows viz-settings]}]
+  (let [field-name    (:scalar.field viz-settings)
+        [row-idx col] (or (when field-name
+                            (get-col-by-name cols field-name))
+                          [0 (first cols)])
+        row           (first rows)
+        raw-value     (get row row-idx)
+        value         (format-cell timezone-id raw-value col viz-settings)]
     {:attachments
      nil
 
@@ -654,8 +529,46 @@
       (h value)]
      :render/text (str value)}))
 
-(s/defmethod render :smartscalar :- common/RenderedPulseCard
-  [_ _ timezone-id _card _ {:keys [cols insights viz-settings]}]
+;; the `:javascript_visualization` render method
+;; is and will continue to handle more and more 'isomorphic' chart types.
+;; Isomorphic in this context just means the frontend Code is mostly shared between the app and the static-viz
+;; As of 2024-03-21, isomorphic chart types include: line, area, bar (LAB), and trend charts
+;; Because this effort began with LAB charts, this method is written to handle multi-series dashcards.
+;; Trend charts were added more recently and will not have multi-series.
+;; Despite this, the function `pu/execute-multi-card` will still correctly execute dashcards.
+;; This conditional is here to cover the case of trend charts in Alerts (not subscriptions). Alerts
+;; exist on Questions and thus have no associated dashcard, which causes `pu/execute-multi-card` to fail.
+(mu/defmethod render :javascript_visualization :- formatter/RenderedPulseCard
+  [_chart-type render-type _timezone-id card dashcard _data]
+  (let [combined-cards-results (if dashcard
+                                 (pu/execute-multi-card card dashcard)
+                                 [(pu/execute-card {:creator_id (:creator_id card)} (:id card))])
+        cards-with-data        (map
+                                (comp
+                                 add-dashcard-timeline-events
+                                 (fn [c d] {:card c :data d}))
+                                (map :card combined-cards-results)
+                                (map #(get-in % [:result :data]) combined-cards-results))
+        dashcard-viz-settings  (get dashcard :visualization_settings)
+        {rendered-type :type content :content} (js-svg/javascript-visualization cards-with-data dashcard-viz-settings)]
+    (case rendered-type
+      :svg
+      (let [image-bundle (image-bundle/make-image-bundle
+                           render-type
+                           (js-svg/svg-string->bytes content))]
+        {:attachments
+         (when image-bundle
+           (image-bundle/image-bundle->attachment image-bundle))
+
+         :content
+         [:div
+          [:img {:style (style/style {:display :block :width :100%})
+                 :src   (:image-src image-bundle)}]]})
+      :html
+      {:content [:div content] :attachments nil})))
+
+(mu/defmethod render :smartscalar :- formatter/RenderedPulseCard
+  [_chart-type _render-type timezone-id _card _dashcard {:keys [cols insights viz-settings]}]
   (letfn [(col-of-type [t c] (or (isa? (:effective_type c) t)
                                  ;; computed and agg columns don't have an effective type
                                  (isa? (:base_type c) t)))
@@ -673,8 +586,9 @@
               previous        (format-cell timezone-id previous-value metric-col viz-settings)
               adj             (if (pos? last-change) (tru "Up") (tru "Down"))
               delta-statement (if (= last-value previous-value)
-                                "No change."
-                                (str adj " " (percentage last-change) "."))]
+                                "No change"
+                                (str adj " " (percentage last-change)))
+              comparison-statement (str " vs. previous " (format-unit unit) ": " previous)]
           {:attachments nil
            :content     [:div
                          [:div {:style (style/style (style/scalar-style))}
@@ -684,10 +598,10 @@
                                                    :font-weight   700
                                                    :padding-right :16px})}
                           delta-statement
-                          " Was " previous " last " (format-unit unit)]]
+                          comparison-statement]]
            :render/text (str value "\n"
                              delta-statement
-                             " Was " previous " last " (format-unit unit))})
+                             comparison-statement)})
         ;; In other words, defaults to plain scalar if we don't have actual changes
         {:attachments nil
          :content     [:div
@@ -698,116 +612,82 @@
                                                  :font-weight   700
                                                  :padding-right :16px})}
                         (trs "Nothing to compare to.")]]
-         :render/text (str last-value "\n" (trs "Nothing to compare to."))}))))
+         :render/text (str (format-cell timezone-id last-value metric-col viz-settings)
+                           "\n" (trs "Nothing to compare to."))}))))
 
-(s/defmethod render :sparkline :- common/RenderedPulseCard
-  [_ render-type timezone-id card _ {:keys [_rows cols viz-settings] :as data}]
+(defn- all-unique?
+  [funnel-rows]
+  (let [ks (into #{} (map :key) funnel-rows)]
+    (= (count ks) (count funnel-rows))))
+
+(defn- funnel-rows
+  "Creates the expected row form for the javascript side of our funnel rendering.
+  If funnel-viz exists, we want to use the value in :key as the first elem in the row.
+
+  Eg. funnel-viz -> [{:key \"asdf\" :name \"Asdf\" :enabled true}
+                     {:key \"wasd\" :name \"Wasd\" :enabled true}]
+        raw-rows -> [[1 234] [2 5678]]
+
+  Should become: [[\"asdf\" 234]
+                  [\"wasd\" 5678]]
+
+  Additionally, raw-rows can come in with strings already. In this case we want simply to re-order
+  The raw-rows based on the order of the funnel-rows.
+
+  Eg. funnel-viz -> [{:key \"wasd\" :name \"Wasd\" :enabled true}
+                     {:key \"asdf\" :name \"Asdf\" :enabled true}]
+        raw-rows ->  [[\"asdf\" 234] [\"wasd\" 5678]]
+
+  Should become: [[\"wasd\" 5678]
+                  [\"asdf\" 234]]"
+  [funnel-viz raw-rows]
+  (if (string? (ffirst raw-rows))
+    ;; re-create the rows with the order/visibility specified in the funnel-viz
+    (let [rows (into {} (vec raw-rows))]
+      (for [{k        :key
+             enabled? :enabled} funnel-viz
+            :when               enabled?]
+        [k (get rows k)]))
+    ;; re-create the rows with the label/visibilty specified in the funnel-viz
+    (let [rows-data (map (fn [{k :key enabled? :enabled} [_ value]]
+                           (when enabled?
+                             [k value])) funnel-viz raw-rows)]
+      (remove nil? rows-data))))
+
+(mu/defmethod render :funnel_normal :- formatter/RenderedPulseCard
+  [_chart-type render-type _timezone-id card _dashcard {:keys [rows cols viz-settings] :as data}]
   (let [[x-axis-rowfn
-         y-axis-rowfn] (common/graphing-column-row-fns card data)
-        [x-col y-col]  ((juxt x-axis-rowfn y-axis-rowfn) cols)
-        rows           (sparkline/cleaned-rows timezone-id card data)
-        last-rows      (reverse (take-last 2 rows))
-        values         (for [row last-rows]
-                         (some-> row y-axis-rowfn common/format-number))
-        labels         (datetime/format-temporal-string-pair timezone-id
-                                                             (map x-axis-rowfn last-rows)
-                                                             (x-axis-rowfn cols))
-        render-fn      (if (isa? (-> cols x-axis-rowfn :effective_type) :type/Temporal)
-                         js-svg/timelineseries-line
-                         js-svg/categorical-line)
-        image-bundle   (image-bundle/make-image-bundle
-                        render-type
-                        (render-fn (mapv (juxt x-axis-rowfn y-axis-rowfn) rows)
-                                   (x-and-y-axis-label-info x-col y-col viz-settings)
-                                   (->js-viz x-col y-col viz-settings)))]
+         y-axis-rowfn] (formatter/graphing-column-row-fns card data)
+        funnel-viz    (:funnel.rows viz-settings)
+        raw-rows       (map (juxt x-axis-rowfn y-axis-rowfn)
+                            (formatter/row-preprocess x-axis-rowfn y-axis-rowfn rows))
+        rows          (if (and funnel-viz (all-unique? funnel-viz))
+                         (funnel-rows funnel-viz raw-rows)
+                         raw-rows)
+        [x-col y-col] cols
+        settings      (as-> (->js-viz x-col y-col viz-settings) jsviz-settings
+                        (assoc jsviz-settings :step    {:name   (:display_name x-col)
+                                                        :format (:x jsviz-settings)}
+                               :measure {:format (:y jsviz-settings)}))
+        svg           (js-svg/funnel rows settings)
+        image-bundle  (image-bundle/make-image-bundle render-type svg)]
     {:attachments
-     (when image-bundle
-       (image-bundle/image-bundle->attachment image-bundle))
-
-     :content
-     [:div
-      [:img {:style (style/style {:display :block
-                                  :width   :100%})
-             :src   (:image-src image-bundle)}]
-      [:table {:style (style/style {:border-spacing :0px})}
-       [:tr
-        [:td {:style (style/style {:color         style/color-text-dark
-                                   :font-size     :16px
-                                   :font-weight   700
-                                   :padding-right :16px})}
-         (first values)]
-        [:td {:style (style/style {:color       style/color-gray-3
-                                   :font-size   :16px
-                                   :font-weight 700})}
-         (second values)]]
-       [:tr
-        [:td {:style (style/style {:color         style/color-text-dark
-                                   :font-size     :12px
-                                   :font-weight   700
-                                   :padding-right :16px})}
-         (first labels)]
-        [:td {:style (style/style {:color     style/color-gray-3
-                                   :font-size :12px})}
-         (second labels)]]]]}))
-
-(s/defmethod render :waterfall :- common/RenderedPulseCard
-  [_ render-type _timezone-id card _ {:keys [rows cols viz-settings] :as data}]
-  (let [[x-axis-rowfn
-         y-axis-rowfn] (common/graphing-column-row-fns card data)
-        [x-col y-col]  ((juxt x-axis-rowfn y-axis-rowfn) cols)
-        rows           (map (juxt x-axis-rowfn y-axis-rowfn)
-                            (common/row-preprocess x-axis-rowfn y-axis-rowfn rows))
-        labels         (x-and-y-axis-label-info x-col y-col viz-settings)
-        render-fn      (if (isa? (-> cols x-axis-rowfn :effective_type) :type/Temporal)
-                         js-svg/timelineseries-waterfall
-                         js-svg/categorical-waterfall)
-        show-total     (if (nil? (:waterfall.show_total viz-settings))
-                         true
-                         (:waterfall.show_total viz-settings))
-        settings       (-> (->js-viz x-col y-col viz-settings)
-                           (update-in [:colors] assoc
-                                      :waterfallTotal (or (:waterfall.total_color viz-settings) (nth colors 0))
-                                      :waterfallPositive (or (:waterfall.increase_color viz-settings) (nth colors 1))
-                                      :waterfallNegative (or (:waterfall.decrease_color viz-settings) (nth colors 2)))
-                           (assoc :showTotal show-total))
-        image-bundle   (image-bundle/make-image-bundle
-                        render-type
-                        (render-fn rows
-                                   labels
-                                   settings))]
-    {:attachments
-     (when image-bundle
-       (image-bundle/image-bundle->attachment image-bundle))
+     (image-bundle/image-bundle->attachment image-bundle)
 
      :content
      [:div
       [:img {:style (style/style {:display :block :width :100%})
              :src   (:image-src image-bundle)}]]}))
 
-(s/defmethod render :funnel :- common/RenderedPulseCard
-  [_ render-type _timezone-id card _ {:keys [rows cols viz-settings] :as data}]
-  (let [[x-axis-rowfn
-         y-axis-rowfn] (common/graphing-column-row-fns card data)
-        rows           (map (juxt x-axis-rowfn y-axis-rowfn)
-                            (common/row-preprocess x-axis-rowfn y-axis-rowfn rows))
-        [x-col y-col]  cols
-        settings       (as-> (->js-viz x-col y-col viz-settings) jsviz-settings
-                         (assoc jsviz-settings :step    {:name   (:display_name x-col)
-                                                         :format (:x jsviz-settings)}
-                                :measure {:format (:y jsviz-settings)}))
-        svg            (js-svg/funnel rows settings)
-        image-bundle   (image-bundle/make-image-bundle render-type svg)]
-   {:attachments
-    (image-bundle/image-bundle->attachment image-bundle)
+(mu/defmethod render :funnel :- formatter/RenderedPulseCard
+  [_chart-type render-type timezone-id card dashcard data]
+  (let [viz-settings (get card :visualization_settings)]
+    (if (= (get viz-settings :funnel.type) "bar")
+      (render :javascript_visualization render-type timezone-id card dashcard data)
+      (render :funnel_normal render-type timezone-id card dashcard data))))
 
-    :content
-    [:div
-     [:img {:style (style/style {:display :block :width :100%})
-            :src   (:image-src image-bundle)}]]}))
-
-
-(s/defmethod render :empty :- common/RenderedPulseCard
-  [_ render-type _ _ _ _]
+(mu/defmethod render :empty :- formatter/RenderedPulseCard
+  [_chart-type render-type _timezone-id _card _dashcard _data]
   (let [image-bundle (image-bundle/no-results-image-bundle render-type)]
     {:attachments
      (image-bundle/image-bundle->attachment image-bundle)
@@ -820,10 +700,11 @@
                      (style/font-style)
                      {:margin-top :8px
                       :color      style/color-gray-4})}
-       (trs "No results")]]}))
+       (trs "No results")]]
+     :render/text (trs "No results")}))
 
-(s/defmethod render :attached :- common/RenderedPulseCard
-  [_ render-type _ _ _ _]
+(mu/defmethod render :attached :- formatter/RenderedPulseCard
+  [_chart-type render-type _timezone-id _card _dashcard _data]
   (let [image-bundle (image-bundle/attached-image-bundle render-type)]
     {:attachments
      (image-bundle/image-bundle->attachment image-bundle)
@@ -838,8 +719,8 @@
                       :color      style/color-gray-4})}
        (trs "This question has been included as a file attachment")]]}))
 
-(s/defmethod render :unknown :- common/RenderedPulseCard
-  [_ _ _ _ _ _]
+(mu/defmethod render :unknown :- formatter/RenderedPulseCard
+  [_chart-type _render-type _timezone-id _card _dashcard _data]
   {:attachments
    nil
 
@@ -852,10 +733,10 @@
     [:br]
     (trs "Please view this card in Metabase.")]})
 
-(s/defmethod render :card-error :- common/RenderedPulseCard
-  [_ _ _ _ _ _]
+(mu/defmethod render :card-error :- formatter/RenderedPulseCard
+  [_chart-type _render-type _timezone-id _card _dashcard _data]
   @card-error-rendered-info)
 
-(s/defmethod render :render-error :- common/RenderedPulseCard
-  [_ _ _ _ _ _]
+(mu/defmethod render :render-error :- formatter/RenderedPulseCard
+  [_chart-type _render-type _timezone-id _card _dashcard _data]
   @error-rendered-info)

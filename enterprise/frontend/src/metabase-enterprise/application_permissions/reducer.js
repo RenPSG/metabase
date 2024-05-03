@@ -1,12 +1,13 @@
 import { assocIn } from "icepick";
 
+import * as MetabaseAnalytics from "metabase/lib/analytics";
 import {
   createAction,
   createThunkAction,
   handleActions,
   combineReducers,
 } from "metabase/lib/redux";
-import * as MetabaseAnalytics from "metabase/lib/analytics";
+
 import { ApplicationPermissionsApi } from "./api";
 
 const INITIALIZE_APPLICATION_PERMISSIONS =
@@ -48,10 +49,8 @@ export const saveApplicationPermissions = createThunkAction(
   () => async (_dispatch, getState) => {
     MetabaseAnalytics.trackStructEvent("General Permissions", "save");
 
-    const {
-      applicationPermissions,
-      applicationPermissionsRevision,
-    } = getState().plugins.applicationPermissionsPlugin;
+    const { applicationPermissions, applicationPermissionsRevision } =
+      getState().plugins.applicationPermissionsPlugin;
 
     const result = await ApplicationPermissionsApi.updateGraph({
       groups: applicationPermissions,

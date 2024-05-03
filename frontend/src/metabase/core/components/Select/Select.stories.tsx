@@ -1,8 +1,6 @@
-import React from "react";
-import _ from "underscore";
-import { ComponentStory } from "@storybook/react";
+import type { ComponentStory } from "@storybook/react";
+
 import Select from "./Select";
-import { field_semantic_types } from "metabase/lib/core";
 
 export default {
   title: "Core/Select",

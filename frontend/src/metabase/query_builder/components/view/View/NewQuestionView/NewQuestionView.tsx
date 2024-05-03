@@ -1,23 +1,26 @@
-import React from "react";
+import cx from "classnames";
 import { t } from "ttag";
 
 import Subhead from "metabase/components/type/Subhead";
-import StructuredQuery from "metabase-lib/lib/queries/StructuredQuery";
-
-import QuestionDataSelector from "../../QuestionDataSelector";
+import CS from "metabase/css/core/index.css";
+import type { updateQuestion } from "metabase/query_builder/actions";
+import { QuestionDataSelector } from "metabase/query_builder/components/view/QuestionDataSelector";
+import type Question from "metabase-lib/v1/Question";
 
 type Props = {
-  query: StructuredQuery;
+  question: Question;
+  updateQuestion: typeof updateQuestion;
 };
 
-function NewQuestionView({ query }: Props) {
+function NewQuestionView({ question, updateQuestion }: Props) {
   return (
-    <div className="full-height">
-      <div className="p4 mx2">
+    <div className={CS.fullHeight}>
+      <div className={cx(CS.p4, CS.mx2)}>
         <QuestionDataSelector
-          query={query}
+          question={question}
+          updateQuestion={updateQuestion}
           triggerElement={
-            <Subhead className="mb2">{t`Pick your data`}</Subhead>
+            <Subhead className={CS.mb2}>{t`Pick your data`}</Subhead>
           }
         />
       </div>
@@ -25,4 +28,5 @@ function NewQuestionView({ query }: Props) {
   );
 }
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default NewQuestionView;

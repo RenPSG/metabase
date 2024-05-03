@@ -1,15 +1,12 @@
-import React, {
-  CSSProperties,
-  forwardRef,
-  Ref,
-  useCallback,
-  useMemo,
-  useState,
-} from "react";
-import moment, { Moment } from "moment";
+import type { Moment } from "moment-timezone"; // eslint-disable-line no-restricted-imports -- deprecated usage
+import moment from "moment-timezone"; // eslint-disable-line no-restricted-imports -- deprecated usage
+import type { CSSProperties, Ref } from "react";
+import { forwardRef, useCallback, useMemo } from "react";
 import { t } from "ttag";
-import TimeInput from "metabase/core/components/TimeInput";
+
 import Calendar from "metabase/components/Calendar";
+import TimeInput from "metabase/core/components/TimeInput";
+
 import {
   SelectorFooter,
   SelectorSubmitButton,
@@ -22,7 +19,7 @@ export interface DateSelectorProps {
   style?: CSSProperties;
   value?: Moment;
   hasTime?: boolean;
-  is24HourMode?: boolean;
+  timeFormat?: string;
   onChange?: (date?: Moment) => void;
   onHasTimeChange?: (hasTime: boolean) => void;
   onSubmit?: () => void;
@@ -34,7 +31,7 @@ const DateSelector = forwardRef(function DateSelector(
     style,
     value,
     hasTime,
-    is24HourMode,
+    timeFormat,
     onChange,
     onHasTimeChange,
     onSubmit,
@@ -79,7 +76,7 @@ const DateSelector = forwardRef(function DateSelector(
         <SelectorTimeContainer>
           <TimeInput
             value={value}
-            is24HourMode={is24HourMode}
+            timeFormat={timeFormat}
             onChange={onChange}
             onClear={handleTimeClear}
           />
@@ -99,4 +96,5 @@ const DateSelector = forwardRef(function DateSelector(
   );
 });
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default DateSelector;

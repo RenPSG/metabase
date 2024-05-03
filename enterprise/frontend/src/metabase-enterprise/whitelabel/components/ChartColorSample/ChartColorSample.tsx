@@ -1,43 +1,46 @@
-import React, { memo, useMemo } from "react";
-import { times } from "lodash";
+import { memo, useMemo } from "react";
+import _ from "underscore";
+
 import {
+  ChartAxis,
   ChartBar,
   ChartBarSection,
-  ChartPlot,
   ChartGrid,
-  ChartTick,
+  ChartPlot,
   ChartRoot,
-  ChartAxis,
+  ChartTick,
 } from "./ChartColorSample.styled";
 
-const BAR_COUNT = 4;
+const BAR_HEIGHTS = [0.75, 0.875, 1];
 const TICK_COUNT = 8;
 
 export interface ChartColorSampleProps {
-  colors: string[];
+  colorGroups: string[][];
 }
 
-const ChartColorSample = ({ colors }: ChartColorSampleProps): JSX.Element => {
-  const reversedColors = useMemo(() => [...colors].reverse(), [colors]);
+const ChartColorSample = ({
+  colorGroups,
+}: ChartColorSampleProps): JSX.Element => {
+  const reversedGroups = useMemo(
+    () => colorGroups.map(group => [...group].reverse()),
+    [colorGroups],
+  );
 
   return (
     <ChartRoot>
       <ChartGrid>
-        {times(TICK_COUNT, index => (
+        {_.times(TICK_COUNT, index => (
           <ChartTick key={index} />
         ))}
         <ChartAxis />
       </ChartGrid>
       <ChartPlot>
-        {times(BAR_COUNT, index => (
+        {reversedGroups.map((group, index) => (
           <ChartBar key={index} style={{ height: getBarHeight(index) }}>
-            {reversedColors.map((color, index) => (
+            {group.map((color, index) => (
               <ChartBarSection
                 key={index}
-                style={{
-                  flexGrow: getBarSectionHeight(index),
-                  backgroundColor: color,
-                }}
+                style={{ flexGrow: index + 1, backgroundColor: color }}
               />
             ))}
           </ChartBar>
@@ -48,11 +51,8 @@ const ChartColorSample = ({ colors }: ChartColorSampleProps): JSX.Element => {
 };
 
 const getBarHeight = (index: number) => {
-  return index === 0 ? "87.5%" : "100%";
+  return `${BAR_HEIGHTS[index % BAR_HEIGHTS.length] * 100}%`;
 };
 
-const getBarSectionHeight = (index: number) => {
-  return index + 1;
-};
-
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default memo(ChartColorSample);

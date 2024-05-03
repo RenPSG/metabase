@@ -1,21 +1,23 @@
-import styled from "@emotion/styled";
 import { css } from "@emotion/react";
-
-import Icon, { IconProps } from "metabase/components/Icon";
+import styled from "@emotion/styled";
 
 import { color } from "metabase/lib/colors";
+import { Icon } from "metabase/ui";
 
 type VariantProp = { variant?: "default" | "form-field" };
 
 export const Root = styled.div<{
   disabled?: boolean;
   noPadding?: boolean;
+  inline?: boolean;
+  marginBottom?: string;
+  borderBottom?: boolean;
 }>`
   ${props =>
     !props.noPadding &&
     css`
-      margin-left: 2em;
-      margin-right: 2em;
+      margin-left: 2rem;
+      margin-right: 2rem;
     `}
 
   ${props =>
@@ -27,7 +29,7 @@ export const Root = styled.div<{
   ${props =>
     !props.hidden &&
     css`
-      margin-bottom: 1.5em;
+      margin-bottom: ${props.marginBottom || "1.5em"};
     `}
 
   ${props =>
@@ -36,8 +38,29 @@ export const Root = styled.div<{
       pointer-events: none;
       opacity: 0.4;
     `}
+  ${props =>
+    props.inline &&
+    !props.hidden &&
+    css`
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
 
-  input, .AdminSelect {
+      ${Title} {
+        display: inline-flex;
+        margin-bottom: 0;
+      }
+    `}
+
+    ${props =>
+    props.borderBottom &&
+    css`
+      padding-bottom: 1rem;
+      border-bottom: 1px solid ${color("border")};
+    `}
+
+  input {
     transition: border 0.3s;
 
     &:hover {
@@ -50,12 +73,14 @@ export const Root = styled.div<{
 export const Title = styled.label<VariantProp>`
   display: flex;
   align-items: center;
-  margin-bottom: 0.5em;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  line-height: 0.875rem;
 
   ${props =>
     props.variant === "default" &&
     css`
-      font-weight: 700;
+      line-height: normal;
     `}
 `;
 

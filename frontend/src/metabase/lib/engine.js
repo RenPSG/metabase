@@ -1,5 +1,10 @@
-import Settings from "metabase/lib/settings";
 import { formatSQL } from "metabase/lib/formatting";
+import Settings from "metabase/lib/settings";
+
+export function getDefaultEngine() {
+  const engines = Object.keys(Settings.get("engines"));
+  return engines.includes("postgres") ? "postgres" : engines[0];
+}
 
 export function getEngineNativeType(engine) {
   switch (engine) {
@@ -12,18 +17,16 @@ export function getEngineNativeType(engine) {
   }
 }
 
+export function getNativeQueryLanguage(engine) {
+  return getEngineNativeType(engine).toUpperCase();
+}
+
 export function getEngineNativeAceMode(engine) {
   switch (engine) {
     case "mongo":
     case "druid":
     case "googleanalytics":
       return "ace/mode/json";
-    case "mysql":
-      return "ace/mode/mysql";
-    case "postgres":
-      return "ace/mode/pgsql";
-    case "sqlserver":
-      return "ace/mode/sqlserver";
     default:
       return "ace/mode/sql";
   }
@@ -41,7 +44,6 @@ export function getEngineLogo(engine) {
     case "mysql":
     case "oracle":
     case "postgres":
-    case "presto":
     case "redshift":
     case "snowflake":
     case "sparksql":
@@ -55,6 +57,8 @@ export function getEngineLogo(engine) {
       return `${path}/presto.svg`;
     case "starburst":
       return `${path}/starburst.svg`;
+    case "materialize":
+      return `${path}/materialize.svg`;
   }
 }
 
@@ -67,10 +71,6 @@ export function getElevatedEngines() {
     "bigquery-cloud-sdk",
     "snowflake",
   ];
-}
-
-export function getEngineNativeRequiresTable(engine) {
-  return engine === "mongo";
 }
 
 export function getEngineSupportsFirewall(engine) {

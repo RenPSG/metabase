@@ -1,25 +1,32 @@
-import React, { Fragment } from "react";
 import PropTypes from "prop-types";
+import { Fragment } from "react";
 import { t } from "ttag";
-import { color } from "metabase/lib/colors";
-import * as Urls from "metabase/lib/urls";
-import { isSyncCompleted } from "metabase/lib/syncing";
-import { SAVED_QUESTIONS_VIRTUAL_DB_ID } from "metabase/lib/saved-questions";
-import Database from "metabase/entities/databases";
-import EntityItem from "metabase/components/EntityItem";
-import Icon from "metabase/components/Icon";
-import { Grid } from "metabase/components/Grid";
 
-import { ANALYTICS_CONTEXT } from "../../constants";
-import BrowseHeader from "../BrowseHeader";
+import { BrowserCrumbs } from "metabase/components/BrowserCrumbs";
+import EntityItem from "metabase/components/EntityItem";
+import Database from "metabase/entities/databases";
+import { color } from "metabase/lib/colors";
+import { isSyncInProgress } from "metabase/lib/syncing";
+import * as Urls from "metabase/lib/urls";
+import { Icon } from "metabase/ui";
+import {
+  isVirtualCardId,
+  SAVED_QUESTIONS_VIRTUAL_DB_ID,
+} from "metabase-lib/v1/metadata/utils/saved-questions";
+
+import { trackTableClick } from "../../analytics";
+import { BrowseHeaderContent } from "../BrowseHeader.styled";
+
 import {
   TableActionLink,
   TableCard,
+  TableGrid,
   TableGridItem,
   TableLink,
 } from "./TableBrowser.styled";
 
 const propTypes = {
+  database: PropTypes.object,
   tables: PropTypes.array.isRequired,
   getTableUrl: PropTypes.func.isRequired,
   metadata: PropTypes.object,
@@ -30,6 +37,7 @@ const propTypes = {
 };
 
 const TableBrowser = ({
+  database,
   tables,
   getTableUrl,
   metadata,
@@ -39,23 +47,28 @@ const TableBrowser = ({
   showSchemaInHeader = true,
 }) => {
   return (
-    <div>
-      <BrowseHeader
-        crumbs={[
-          { title: t`Our data`, to: "/browse" },
-          getDatabaseCrumbs(dbId),
-          showSchemaInHeader && { title: schemaName },
-        ]}
-      />
-      <Grid>
+    <>
+      <BrowseHeaderContent>
+        <BrowserCrumbs
+          crumbs={[
+            { title: t`Databases`, to: "/browse/databases" },
+            getDatabaseCrumbs(dbId),
+            showSchemaInHeader && { title: schemaName },
+          ]}
+        />
+      </BrowseHeaderContent>
+      <TableGrid>
         {tables.map(table => (
           <TableGridItem key={table.id}>
-            <TableCard hoverable={isSyncCompleted(table)}>
+            <TableCard hoverable={!isSyncInProgress(table)}>
               <TableLink
-                to={isSyncCompleted(table) ? getTableUrl(table, metadata) : ""}
-                data-metabase-event={`${ANALYTICS_CONTEXT};Table Click`}
+                to={
+                  !isSyncInProgress(table) ? getTableUrl(table, metadata) : ""
+                }
+                onClick={() => trackTableClick(table.id)}
               >
                 <TableBrowserItem
+                  database={database}
                   table={table}
                   dbId={dbId}
                   xraysEnabled={xraysEnabled}
@@ -64,30 +77,35 @@ const TableBrowser = ({
             </TableCard>
           </TableGridItem>
         ))}
-      </Grid>
-    </div>
+      </TableGrid>
+    </>
   );
 };
 
 TableBrowser.propTypes = propTypes;
 
 const itemPropTypes = {
+  database: PropTypes.object,
   table: PropTypes.object.isRequired,
   dbId: PropTypes.number,
   xraysEnabled: PropTypes.bool,
 };
 
-const TableBrowserItem = ({ table, dbId, xraysEnabled }) => {
+const TableBrowserItem = ({ database, table, dbId, xraysEnabled }) => {
+  const isVirtual = isVirtualCardId(table.id);
+  const isLoading = isSyncInProgress(table);
+
   return (
     <EntityItem
       item={table}
       name={table.display_name || table.name}
       iconName="table"
       iconColor={color("accent2")}
-      loading={!isSyncCompleted(table)}
-      disabled={!isSyncCompleted(table)}
+      loading={isLoading}
+      disabled={isLoading}
       buttons={
-        isSyncCompleted(table) && (
+        !isLoading &&
+        !isVirtual && (
           <TableBrowserItemButtons
             tableId={table.id}
             dbId={dbId}
@@ -111,22 +129,15 @@ const TableBrowserItemButtons = ({ tableId, dbId, xraysEnabled }) => {
   return (
     <Fragment>
       {xraysEnabled && (
-        <TableActionLink
-          to={`/auto/dashboard/table/${tableId}`}
-          data-metabase-event={`${ANALYTICS_CONTEXT};Table Item;X-ray Click`}
-        >
+        <TableActionLink to={`/auto/dashboard/table/${tableId}`}>
           <Icon
-            name="bolt"
-            size={20}
+            name="bolt_filled"
             tooltip={t`X-ray this table`}
             color={color("warning")}
           />
         </TableActionLink>
       )}
-      <TableActionLink
-        to={`/reference/databases/${dbId}/tables/${tableId}`}
-        data-metabase-event={`${ANALYTICS_CONTEXT};Table Item;Reference Click`}
-      >
+      <TableActionLink to={`/reference/databases/${dbId}/tables/${tableId}`}>
         <Icon
           name="reference"
           tooltip={t`Learn about this table`}

@@ -1,11 +1,8 @@
-import React, {
-  forwardRef,
-  MouseEvent,
-  HTMLAttributes,
-  Ref,
-  useCallback,
-} from "react";
+import type { MouseEvent, HTMLAttributes, Ref } from "react";
+import { forwardRef, useCallback } from "react";
+
 import { ColorPillContent, ColorPillRoot } from "./ColorPill.styled";
+import type { PillSize } from "./types";
 
 export type ColorPillAttributes = Omit<
   HTMLAttributes<HTMLDivElement>,
@@ -17,6 +14,7 @@ export interface ColorPillProps extends ColorPillAttributes {
   isAuto?: boolean;
   isSelected?: boolean;
   onSelect?: (newColor: string) => void;
+  pillSize?: PillSize;
 }
 
 const ColorPill = forwardRef(function ColorPill(
@@ -25,6 +23,7 @@ const ColorPill = forwardRef(function ColorPill(
     isAuto = false,
     isSelected = true,
     "aria-label": ariaLabel = color,
+    pillSize = "medium",
     onClick,
     onSelect,
     ...props
@@ -47,10 +46,15 @@ const ColorPill = forwardRef(function ColorPill(
       isSelected={isSelected}
       aria-label={ariaLabel}
       onClick={handleClick}
+      pillSize={pillSize}
     >
       <ColorPillContent style={{ backgroundColor: color }} />
     </ColorPillRoot>
   );
 });
 
-export default ColorPill;
+// eslint-disable-next-line import/no-default-export -- deprecated usage
+export default Object.assign(ColorPill, {
+  Content: ColorPillContent,
+  Root: ColorPillRoot,
+});

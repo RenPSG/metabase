@@ -1,7 +1,10 @@
 import styled from "@emotion/styled";
-import Icon from "metabase/components/Icon";
+
 import { color } from "metabase/lib/colors";
-import {
+import { Icon } from "metabase/ui";
+
+import { DEFAULT_ICON_PADDING } from "./constants";
+import type {
   CheckBoxContainerProps,
   CheckBoxIconContainerProps,
   CheckBoxIconProps,
@@ -47,6 +50,7 @@ export const CheckBoxContainer = styled.span<CheckBoxContainerProps>`
 
 export const CheckBoxIcon = styled(Icon)<CheckBoxIconProps>`
   display: block;
+  padding: ${DEFAULT_ICON_PADDING / 2}px;
   color: ${props => color(props.checked ? "white" : props.uncheckedColor)};
   width: ${props => `${props.size}px`};
   height: ${props => `${props.size}px`};

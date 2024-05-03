@@ -10,23 +10,30 @@ const GRADIENT_ALPHA = 0.75;
 
 // for simplicity wheb typing assume all values are numbers, since you can only pick numeric columns
 
-export function makeCellBackgroundGetter(rows, cols, settings) {
-  const formats = settings["table.column_formatting"] || [];
-  const pivot = settings["table.pivot"];
+export function makeCellBackgroundGetter(
+  rows,
+  cols,
+  formattingSettings,
+  isPivoted,
+) {
   let formatters = {};
   let rowFormatters = [];
   const colIndexes = getColumnIndexesByName(cols);
   try {
-    const columnExtents = computeColumnExtents(formats, rows, colIndexes);
-    formatters = compileFormatters(formats, columnExtents);
-    rowFormatters = compileRowFormatters(formats, columnExtents);
+    const columnExtents = computeColumnExtents(
+      formattingSettings,
+      rows,
+      colIndexes,
+    );
+    formatters = compileFormatters(formattingSettings, columnExtents);
+    rowFormatters = compileRowFormatters(formattingSettings, columnExtents);
   } catch (e) {
     console.error("Unexpected error compiling column formatters: ", e);
   }
   if (Object.keys(formatters).length === 0 && rowFormatters.length === 0) {
     return () => null;
   } else {
-    return function(value, rowIndex, colName) {
+    return function (value, rowIndex, colName) {
       if (formatters[colName]) {
         // const value = rows[rowIndex][colIndexes[colName]];
         for (let i = 0; i < formatters[colName].length; i++) {
@@ -38,7 +45,7 @@ export function makeCellBackgroundGetter(rows, cols, settings) {
         }
       }
       // don't highlight row for pivoted tables
-      if (!pivot) {
+      if (!isPivoted) {
         for (let i = 0; i < rowFormatters.length; i++) {
           const rowFormatter = rowFormatters[i];
           const color = rowFormatter(rows[rowIndex], colIndexes);
@@ -74,11 +81,11 @@ export const OPERATOR_FORMATTER_FACTORIES = {
     typeof value === "number" && v >= value ? color : null,
   ">": (value, color) => v =>
     typeof value === "number" && v > value ? color : null,
-  "=": (value, color) => v => (v === value ? color : null),
+  "=": (value, color) => v => v === value ? color : null,
   "!=": (value, color) => v =>
     !isEmptyString(value) && v !== value ? color : null,
-  "is-null": (_value, color) => v => (v === null ? color : null),
-  "not-null": (_value, color) => v => (v !== null ? color : null),
+  "is-null": (_value, color) => v => v === null ? color : null,
+  "not-null": (_value, color) => v => v !== null ? color : null,
   contains: (value, color) => v =>
     canCompareSubstrings(value, v) && v.indexOf(value) >= 0 ? color : null,
   "does-not-contain": (value, color) => v =>
@@ -87,6 +94,8 @@ export const OPERATOR_FORMATTER_FACTORIES = {
     canCompareSubstrings(value, v) && v.startsWith(value) ? color : null,
   "ends-with": (value, color) => v =>
     canCompareSubstrings(value, v) && v.endsWith(value) ? color : null,
+  "is-true": (_value, color) => v => v ? color : null,
+  "is-false": (_value, color) => v => v ? null : color,
 };
 
 export function compileFormatter(
@@ -134,7 +143,13 @@ export function compileFormatter(
       [min, max],
       format.colors.map(c => alpha(c, GRADIENT_ALPHA)),
     ).clamp(true);
-    return value => getSafeColor(scale(value));
+    return value => {
+      const colorValue = scale(value);
+      if (!colorValue) {
+        return null;
+      }
+      return getSafeColor(colorValue);
+    };
   } else {
     console.warn("Unknown format type", format.type);
     return () => null;
@@ -143,16 +158,16 @@ export function compileFormatter(
 
 // NOTE: implement `extent` like this rather than using d3.extent since rows may
 // be a Java `List` rather than a JavaScript Array when used in Pulse formatting
-function extent(rows, colIndex) {
+export function extent(rows, colIndex) {
   let min = Infinity;
   let max = -Infinity;
   const length = rows.length;
   for (let i = 0; i < length; i++) {
     const value = rows[i][colIndex];
-    if (value < min) {
+    if (value != null && value < min) {
       min = value;
     }
-    if (value > max) {
+    if (value != null && value > max) {
       max = value;
     }
   }

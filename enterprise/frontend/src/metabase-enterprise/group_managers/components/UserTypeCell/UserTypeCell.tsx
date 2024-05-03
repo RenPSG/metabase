@@ -1,7 +1,8 @@
-import React from "react";
 import { t } from "ttag";
-import { ChangeTypeButton, UserTypeCellRoot } from "./UserTypeCell.styled";
+
 import { UserTypeToggle } from "../UserTypeToggle";
+
+import { ChangeTypeButton, UserTypeCellRoot } from "./UserTypeCell.styled";
 
 interface UserTypeCellProps {
   isAdmin: boolean;

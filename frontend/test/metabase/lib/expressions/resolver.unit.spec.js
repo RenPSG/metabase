@@ -1,24 +1,30 @@
-import { resolve } from "metabase/lib/expressions/resolver";
+import { createMockMetadata } from "__support__/metadata";
+import { resolve } from "metabase-lib/v1/expressions/resolver";
+import { createSampleDatabase } from "metabase-types/api/mocks/presets";
 
-describe("metabase/lib/expressions/resolve", () => {
+describe("metabase-lib/v1/expressions/resolve", () => {
   function collect(expr, startRule = "expression") {
     const dimensions = [];
     const segments = [];
     const metrics = [];
 
-    resolve(expr, startRule, (kind, name) => {
-      switch (kind) {
-        case "dimension":
-          dimensions.push(name);
-          break;
-        case "segment":
-          segments.push(name);
-          break;
-        case "metric":
-          metrics.push(name);
-          break;
-      }
-      return [kind, name];
+    resolve({
+      expression: expr,
+      type: startRule,
+      fn: (kind, name) => {
+        switch (kind) {
+          case "dimension":
+            dimensions.push(name);
+            break;
+          case "segment":
+            segments.push(name);
+            break;
+          case "metric":
+            metrics.push(name);
+            break;
+        }
+        return [kind, name];
+      },
     });
 
     return { dimensions, segments, metrics };
@@ -149,6 +155,10 @@ describe("metabase/lib/expressions/resolve", () => {
       expect(() => expr(["concat", "1", "2", "3"])).not.toThrow();
     });
 
+    it("should allow nested datetime expressions", () => {
+      expect(() => expr(["get-year", ["now"]])).not.toThrow();
+    });
+
     it("should accept COALESCE for number", () => {
       expect(() => expr(["round", ["coalesce", 0]])).not.toThrow();
     });
@@ -158,6 +168,76 @@ describe("metabase/lib/expressions/resolve", () => {
 
     it("should honor CONCAT's implicit casting", () => {
       expect(() => expr(["concat", ["coalesce", "B", 1]])).not.toThrow();
+    });
+
+    describe("arg validation", () => {
+      it("should not allow substring with index=0", () => {
+        expect(() => expr(["substring", "foo", 0, 1])).toThrow();
+      });
+
+      it("should allow substring with index=1", () => {
+        expect(() => expr(["substring", "foo", 1, 1])).not.toThrow();
+      });
+    });
+
+    describe("datetime functions", () => {
+      it("should resolve unchained functions", () => {
+        expect(() => expr(["get-week", "2022-01-01"])).not.toThrow();
+        expect(() =>
+          expr(["datetime-add", "2022-01-01", 1, "month"]),
+        ).not.toThrow();
+
+        // TODO: Implementation should be fine-tuned so that these throw
+        // as they are not really datetime
+        expect(() => expr(["get-day", A])).not.toThrow();
+        expect(() => expr(["get-day", "a"])).not.toThrow();
+        expect(() => expr(["get-day-of-week", A])).not.toThrow();
+        expect(() => expr(["get-day-of-week", "a"])).not.toThrow();
+        expect(() => expr(["get-week", A])).not.toThrow();
+        expect(() => expr(["get-week", "a"])).not.toThrow();
+        expect(() => expr(["get-month", A])).not.toThrow();
+        expect(() => expr(["get-month", "a"])).not.toThrow();
+        expect(() => expr(["get-quarter", A])).not.toThrow();
+        expect(() => expr(["get-quarter", "a"])).not.toThrow();
+        expect(() => expr(["get-year", A])).not.toThrow();
+        expect(() => expr(["get-year", "a"])).not.toThrow();
+      });
+
+      it("should resolve chained commmands", () => {
+        expect(() =>
+          expr([
+            "datetime-subtract",
+            ["datetime-add", "2022-01-01", 1, "month"],
+            2,
+            "minute",
+          ]),
+        ).not.toThrow();
+      });
+
+      it("should chain datetime functions onto functions of compatible types", () => {
+        expect(() =>
+          expr([
+            "concat",
+            ["datetime-add", "2022-01-01", 1, "month"],
+            "a string",
+          ]),
+        ).not.toThrow();
+      });
+
+      it("should throw if chaining datetime functions onto functions of incompatible types", () => {
+        expect(() =>
+          expr(["trim", ["datetime-add", "2022-01-01", 1, "month"]]),
+        ).toThrow();
+      });
+
+      it("should throw if passing numbers as arguments expected to be datetime", () => {
+        expect(() => expr(["get-day", 15])).toThrow();
+        expect(() => expr(["get-day-of-week", 6])).toThrow();
+        expect(() => expr(["get-week", 52])).toThrow();
+        expect(() => expr(["get-month", 12])).toThrow();
+        expect(() => expr(["get-quarter", 3])).toThrow();
+        expect(() => expr(["get-year", 2025])).toThrow();
+      });
     });
   });
 
@@ -189,9 +269,9 @@ describe("metabase/lib/expressions/resolve", () => {
 
     it("should handle Distinct/Min/Max aggregating over non-numbers", () => {
       // DISTINCT(COALESCE("F")) also for MIN and MAX
-      expect(() => aggregation(["distinct", ["coalesce", "F"]]).not.toThrow());
-      expect(() => aggregation(["min", ["coalesce", "F"]]).not.toThrow());
-      expect(() => aggregation(["max", ["coalesce", "F"]]).not.toThrow());
+      expect(() => aggregation(["distinct", ["coalesce", "F"]])).not.toThrow();
+      expect(() => aggregation(["min", ["coalesce", "F"]])).not.toThrow();
+      expect(() => aggregation(["max", ["coalesce", "F"]])).not.toThrow();
     });
   });
 
@@ -266,12 +346,42 @@ describe("metabase/lib/expressions/resolve", () => {
 
   it("should not fail on literal 0", () => {
     const opt = { default: 0 };
-    expect(resolve(["case", [[X, 0]]])).toEqual(["case", [[X, 0]]]);
-    expect(resolve(["case", [[X, 0]], opt])).toEqual(["case", [[X, 0]], opt]);
-    expect(resolve(["case", [[X, 2]], opt])).toEqual(["case", [[X, 2]], opt]);
+    expect(resolve({ expression: ["case", [[X, 0]]] })).toEqual([
+      "case",
+      [[X, 0]],
+    ]);
+    expect(resolve({ expression: ["case", [[X, 0]], opt] })).toEqual([
+      "case",
+      [[X, 0]],
+      opt,
+    ]);
+    expect(resolve({ expression: ["case", [[X, 2]], opt] })).toEqual([
+      "case",
+      [[X, 2]],
+      opt,
+    ]);
   });
 
   it("should reject unknown function", () => {
-    expect(() => resolve(["foobar", 42])).toThrow();
+    expect(() => resolve({ expression: ["foobar", 42] })).toThrow();
+  });
+
+  it("should reject unsupported function (metabase#39773)", () => {
+    const database = createMockMetadata({
+      databases: [
+        createSampleDatabase({
+          id: 1,
+          features: ["foreign-keys"],
+        }),
+      ],
+    }).database(1);
+
+    expect(() =>
+      resolve({
+        expression: ["percentile", 1, 2],
+        type: "aggregation",
+        database,
+      }),
+    ).toThrow("Unsupported function percentile");
   });
 });

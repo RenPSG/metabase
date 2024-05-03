@@ -1,22 +1,22 @@
 /* eslint "react/prop-types": "warn" */
-import React, { Component } from "react";
-import PropTypes from "prop-types";
-import _ from "underscore";
+import cx from "classnames";
 import { assoc, assocIn } from "icepick";
+import PropTypes from "prop-types";
+import { Component } from "react";
 import { t } from "ttag";
+import _ from "underscore";
+
+import ActionButton from "metabase/components/ActionButton";
+import ChannelSetupMessage from "metabase/components/ChannelSetupMessage";
+import SchedulePicker from "metabase/containers/SchedulePicker";
+import Toggle from "metabase/core/components/Toggle";
+import CS from "metabase/css/core/index.css";
+import * as MetabaseAnalytics from "metabase/lib/analytics";
+import { channelIsValid, createChannel } from "metabase/lib/pulse";
+import SlackChannelField from "metabase/sharing/components/SlackChannelField";
+import { Icon } from "metabase/ui";
 
 import RecipientPicker from "./RecipientPicker";
-
-import SchedulePicker from "metabase/components/SchedulePicker";
-import ActionButton from "metabase/components/ActionButton";
-import Select, { Option } from "metabase/core/components/Select";
-import Toggle from "metabase/core/components/Toggle";
-import Icon from "metabase/components/Icon";
-import ChannelSetupMessage from "metabase/components/ChannelSetupMessage";
-
-import * as MetabaseAnalytics from "metabase/lib/analytics";
-
-import { channelIsValid, createChannel } from "metabase/lib/pulse";
 
 export const CHANNEL_ICONS = {
   email: "mail",
@@ -71,14 +71,14 @@ export default class PulseEditChannels extends Component {
     this.props.setPulse(assocIn(pulse, ["channels", index, "enabled"], false));
   }
 
-  onChannelPropertyChange(index, name, value) {
+  onChannelPropertyChange = (index, name, value) => {
     const { pulse } = this.props;
     const channels = [...pulse.channels];
 
     channels[index] = { ...channels[index], [name]: value };
 
     this.props.setPulse({ ...pulse, channels });
-  }
+  };
 
   // changedProp contains the schedule property that user just changed
   // newSchedule may contain also other changed properties as some property changes reset other properties
@@ -113,15 +113,28 @@ export default class PulseEditChannels extends Component {
         this.addChannel(type);
       }
     } else {
-      this.props.setPulse(
-        assoc(
-          pulse,
-          "channels",
-          pulse.channels.map(c =>
-            c.channel_type === type ? assoc(c, "enabled", false) : c,
-          ),
-        ),
+      const channel = pulse.channels.find(
+        channel => channel.channel_type === type,
       );
+
+      const shouldRemoveChannel =
+        type === "email" && channel?.recipients?.length === 0;
+
+      const updatedPulse = shouldRemoveChannel
+        ? assoc(
+            pulse,
+            "channels",
+            pulse.channels.filter(channel => channel.channel_type !== type),
+          )
+        : assoc(
+            pulse,
+            "channels",
+            pulse.channels.map(c =>
+              c.channel_type === type ? assoc(c, "enabled", false) : c,
+            ),
+          );
+
+      this.props.setPulse(updatedPulse);
 
       MetabaseAnalytics.trackStructEvent(
         this.props.pulseId ? "PulseEdit" : "PulseCreate",
@@ -145,54 +158,20 @@ export default class PulseEditChannels extends Component {
     return empty && this.props.pulse.skip_if_empty;
   };
 
-  renderFields(channel, index, channelSpec) {
-    const valueForField = field => {
-      const value = channel.details && channel.details[field.name];
-      return value != null ? value : null; // convert undefined to null so Uncontrollable doesn't ignore changes
-    };
-    return (
-      <div>
-        {channelSpec.fields.map(field => (
-          <div key={field.name} className={field.name}>
-            <span className="h4 text-bold mr1">{field.displayName}</span>
-            {field.type === "select" ? (
-              <Select
-                className="h4 text-bold bg-white inline-block"
-                value={valueForField(field)}
-                placeholder={t`Pick a user or channel...`}
-                searchProp="name"
-                // Address #5799 where `details` object is missing for some reason
-                onChange={o =>
-                  this.onChannelPropertyChange(index, "details", {
-                    ...channel.details,
-                    [field.name]: o.target.value,
-                  })
-                }
-              >
-                {field.options.map(option => (
-                  <Option key={option} name={option} value={option}>
-                    {option}
-                  </Option>
-                ))}
-              </Select>
-            ) : null}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
   renderChannel(channel, index, channelSpec) {
     const isValid =
       this.props.pulseIsValid && channelIsValid(channel, channelSpec);
+
     return (
-      <li key={index} className="py2">
+      <li key={index} className={CS.py2}>
         {channelSpec.error && (
-          <div className="pb2 text-bold text-error">{channelSpec.error}</div>
+          <div className={cx(CS.pb2, CS.textBold, CS.textError)}>
+            {channelSpec.error}
+          </div>
         )}
         {channelSpec.recipients && (
           <div>
-            <div className="h4 text-bold mb1">
+            <div className={cx(CS.h4, CS.textBold, CS.mb1)}>
               {this.props.emailRecipientText || t`To:`}
             </div>
             <RecipientPicker
@@ -208,7 +187,15 @@ export default class PulseEditChannels extends Component {
             />
           </div>
         )}
-        {channelSpec.fields && this.renderFields(channel, index, channelSpec)}
+        {channelSpec.type === "slack" ? (
+          <SlackChannelField
+            channel={channel}
+            channelSpec={channelSpec}
+            onChannelPropertyChange={(name, value) =>
+              this.onChannelPropertyChange(index, name, value)
+            }
+          />
+        ) : null}
         {!this.props.hideSchedulePicker && channelSpec.schedules && (
           <SchedulePicker
             schedule={_.pick(
@@ -220,14 +207,15 @@ export default class PulseEditChannels extends Component {
             )}
             scheduleOptions={channelSpec.schedules}
             textBeforeInterval={t`Sent`}
-            textBeforeSendTime={t`${CHANNEL_NOUN_PLURAL[
-              channelSpec && channelSpec.type
-            ] || t`Messages`} will be sent at`}
+            textBeforeSendTime={t`${
+              CHANNEL_NOUN_PLURAL[channelSpec && channelSpec.type] ||
+              t`Messages`
+            } will be sent at`}
             onScheduleChange={this.onChannelScheduleChange.bind(this, index)}
           />
         )}
         {this.props.testPulse && (
-          <div className="pt2">
+          <div className={CS.pt2}>
             <ActionButton
               actionFn={this.onTestPulseChannel.bind(this, channel)}
               disabled={
@@ -265,27 +253,31 @@ export default class PulseEditChannels extends Component {
         this.renderChannel(channel, index, channelSpec),
       );
     return (
-      <li key={channelSpec.type} className="border-row-divider">
-        <div className="flex align-center p3 border-row-divider">
+      <li key={channelSpec.type} className={CS.borderRowDivider}>
+        <div
+          className={cx(CS.flex, CS.alignCenter, CS.p3, CS.borderRowDivider)}
+        >
           {CHANNEL_ICONS[channelSpec.type] && (
             <Icon
-              className="mr1 text-light"
+              className={cx(CS.mr1, CS.textLight)}
               name={CHANNEL_ICONS[channelSpec.type]}
               size={28}
             />
           )}
           <h2>{channelSpec.name}</h2>
           <Toggle
-            className="flex-align-right"
+            className={CS.flexAlignRight}
             value={channels.length > 0}
             onChange={this.toggleChannel.bind(this, channelSpec.type)}
           />
         </div>
         {channels.length > 0 && channelSpec.configured ? (
-          <ul className="bg-light px3">{channels}</ul>
+          <ul className={cx(CS.bgLight, CS.px3)}>{channels}</ul>
         ) : channels.length > 0 && !channelSpec.configured ? (
-          <div className="p4 text-centered">
-            <h3 className="mb2">{t`${channelSpec.name} needs to be set up by an administrator.`}</h3>
+          <div className={cx(CS.p4, CS.textCentered)}>
+            <h3
+              className={CS.mb2}
+            >{t`${channelSpec.name} needs to be set up by an administrator.`}</h3>
             <ChannelSetupMessage user={user} channels={[channelSpec.name]} />
           </div>
         ) : null}
@@ -301,7 +293,7 @@ export default class PulseEditChannels extends Component {
       slack: { name: t`Slack`, type: "slack" },
     };
     return (
-      <ul className="bordered rounded bg-white">
+      <ul className={cx(CS.bordered, CS.rounded, CS.bgWhite)}>
         {Object.values(channels).map(channelSpec =>
           this.renderChannelSection(channelSpec),
         )}

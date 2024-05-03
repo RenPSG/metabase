@@ -1,21 +1,25 @@
-import React, { useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import * as React from "react";
 import _ from "underscore";
 
 import { TreeNode } from "metabase/components/tree/TreeNode";
-import { IconProps } from "metabase/components/Icon";
+import type { IconName, IconProps } from "metabase/ui";
 
 import {
   FullWidthLink,
+  ItemName,
   NameContainer,
   NodeRoot,
   SidebarIcon,
   FullWidthButton,
+  LeftElementContainer,
+  RightElementContainer,
 } from "./SidebarItems.styled";
 
-interface Props {
+interface SidebarLinkProps {
   children: string;
   url?: string;
-  icon: string | IconProps | React.ReactElement;
+  icon?: IconName | IconProps | React.ReactElement;
   isSelected?: boolean;
   hasDefaultIconStyle?: boolean;
   left?: React.ReactNode;
@@ -50,8 +54,11 @@ function SidebarLink({
   left = null,
   right = null,
   ...props
-}: Props) {
+}: SidebarLinkProps) {
   const renderIcon = useCallback(() => {
+    if (!icon) {
+      return null;
+    }
     if (React.isValidElement(icon)) {
       return icon;
     }
@@ -76,17 +83,31 @@ function SidebarLink({
       depth={0}
       isSelected={isSelected}
       hasDefaultIconStyle={hasDefaultIconStyle}
+      aria-label={children}
+      aria-selected={isSelected}
       onMouseDown={disableImageDragging}
       {...props}
     >
-      {React.isValidElement(left) && left}
+      {React.isValidElement(left) && (
+        <LeftElementContainer>{left}</LeftElementContainer>
+      )}
       <Content>
         {icon && renderIcon()}
         <NameContainer>{children}</NameContainer>
       </Content>
-      {React.isValidElement(right) && right}
+      {React.isValidElement(right) && (
+        <RightElementContainer>{right}</RightElementContainer>
+      )}
     </NodeRoot>
   );
 }
 
-export default SidebarLink;
+export type { SidebarLinkProps };
+
+// eslint-disable-next-line import/no-default-export -- deprecated usage
+export default Object.assign(SidebarLink, {
+  NameContainers: [ItemName, TreeNode.NameContainer],
+  Icon: SidebarIcon,
+  LeftElement: LeftElementContainer,
+  RightElement: RightElementContainer,
+});

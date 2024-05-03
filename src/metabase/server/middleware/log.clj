@@ -1,22 +1,28 @@
 (ns metabase.server.middleware.log
   "Ring middleware for logging API requests/responses."
-  (:require [clojure.core.async :as a]
-            [clojure.string :as str]
-            [clojure.tools.logging :as log]
-            [metabase.async.streaming-response :as streaming-response]
-            [metabase.async.streaming-response.thread-pool :as thread-pool]
-            [metabase.async.util :as async.u]
-            [metabase.db.connection :as mdb.connection]
-            [metabase.driver.sql-jdbc.execute.diagnostic :as sql-jdbc.execute.diagnostic]
-            [metabase.server :as server]
-            [metabase.server.request.util :as request.u]
-            [metabase.util :as u]
-            [metabase.util.i18n :refer [trs]]
-            [toucan.db :as db])
-  (:import clojure.core.async.impl.channels.ManyToManyChannel
-           com.mchange.v2.c3p0.PoolBackedDataSource
-           metabase.async.streaming_response.StreamingResponse
-           org.eclipse.jetty.util.thread.QueuedThreadPool))
+  (:require
+   [clojure.core.async :as a]
+   [clojure.string :as str]
+   [metabase.api.common :as api]
+   [metabase.async.streaming-response :as streaming-response]
+   [metabase.async.streaming-response.thread-pool :as thread-pool]
+   [metabase.async.util :as async.u]
+   [metabase.db :as mdb]
+   [metabase.driver.sql-jdbc.execute.diagnostic
+    :as sql-jdbc.execute.diagnostic]
+   [metabase.server :as server]
+   [metabase.server.request.util :as req.util]
+   [metabase.util :as u]
+   [metabase.util.i18n :refer [trs]]
+   [metabase.util.log :as log]
+   [toucan2.core :as t2])
+  (:import
+   (clojure.core.async.impl.channels ManyToManyChannel)
+   (com.mchange.v2.c3p0 PoolBackedDataSource)
+   (metabase.async.streaming_response StreamingResponse)
+   (org.eclipse.jetty.util.thread QueuedThreadPool)))
+
+(set! *warn-on-reflection* true)
 
 ;; To simplify passing large amounts of arguments around most functions in this namespace take an "info" map that
 ;; looks like
@@ -36,7 +42,7 @@
     {:keys [request-method uri] :or {request-method :XXX}} :request
     {:keys [status]} :response}]
   (str
-   (format "%s %s %d" (str/upper-case (name request-method)) uri status)
+   (format "%s %s %d" (u/upper-case-en (name request-method)) uri status)
    (when async-status
      (format " [%s: %s]" (trs "ASYNC") async-status))))
 
@@ -50,7 +56,7 @@
 
 (defn- stats [diag-info-fn]
   (str
-   (when-let [^PoolBackedDataSource pool (let [data-source (mdb.connection/data-source)]
+   (when-let [^PoolBackedDataSource pool (let [data-source (mdb/data-source)]
                                            (when (instance? PoolBackedDataSource data-source)
                                              data-source))]
      (trs "App DB connections: {0}/{1}"
@@ -87,10 +93,14 @@
              (or (string? body) (coll? body)))
     (str "\n" (u/pprint-to-str body))))
 
+(defn- format-log-context [{:keys [log-context]} _]
+  (pr-str log-context))
+
 (defn- format-info [info opts]
   (str/join " " (filter some? [(format-status-info info)
                                (format-performance-info info)
                                (format-threads-info info opts)
+                               (format-log-context info opts)
                                (format-error-info info opts)])))
 
 
@@ -101,7 +111,7 @@
 ;; `log-info` below takes an info map and actually writes the log message, using the format functions from the section
 ;; above to create the combined message.
 
-;; `log-options` determines som other formating options, such as the color of the message. The first logger out of the
+;; `log-options` determines some other formatting options, such as the color of the message. The first logger out of the
 ;; list below whose `:status-pred` is true will be used to log the API request/response.
 ;;
 ;; `include-stats?` here is to avoid incurring the cost of collecting the Jetty stats and concatenating the extra
@@ -140,7 +150,7 @@
                 log-options)]
       (log-fn (u/format-color color (format-info info opts))))
     (catch Throwable e
-      (log/error e (trs "Error logging API request")))))
+      (log/error e "Error logging API request"))))
 
 
 ;;; +----------------------------------------------------------------------------------------------------------------+
@@ -188,8 +198,8 @@
 (defn- should-log-request? [{:keys [uri], :as request}]
   ;; don't log calls to /health or /util/logs because they clutter up the logs (especially the window in admin) with
   ;; useless lines
-  (and (request.u/api-call? request)
-       (not (#{"/api/health" "/api/util/logs"} uri))))
+  (and (req.util/api-call? request)
+       (not (#{"/api/util/logs"} uri))))
 
 (defn log-api-call
   "Logs info about request such as status code, number of DB calls, and time taken to complete."
@@ -199,12 +209,13 @@
       ;; non-API call or health or logs call, don't log it
       (handler request respond raise)
       ;; API call, log info about it
-      (db/with-call-counting [call-count-fn]
+      (t2/with-call-count [call-count-fn]
         (sql-jdbc.execute.diagnostic/capturing-diagnostic-info [diag-info-fn]
           (let [info           {:request       request
                                 :start-time    (System/nanoTime)
                                 :call-count-fn call-count-fn
-                                :diag-info-fn  diag-info-fn}
+                                :diag-info-fn  diag-info-fn
+                                :log-context   {:metabase-user-id api/*current-user-id*}}
                 response->info (fn [response]
                                  (assoc info :response response))
                 respond        (comp respond logged-response response->info)]

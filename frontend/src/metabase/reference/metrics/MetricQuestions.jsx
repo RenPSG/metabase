@@ -1,35 +1,26 @@
 /* eslint "react/prop-types": "warn" */
-import React, { Component } from "react";
+import cx from "classnames";
 import PropTypes from "prop-types";
 import { connect } from "react-redux";
-import moment from "moment";
 import { t } from "ttag";
-import visualizations from "metabase/visualizations";
-import * as Urls from "metabase/lib/urls";
 
-import S from "metabase/components/List.css";
-
-import List from "metabase/components/List";
-import ListItem from "metabase/components/ListItem";
+import { useQuestionListQuery } from "metabase/common/hooks";
 import AdminAwareEmptyState from "metabase/components/AdminAwareEmptyState";
-
+import List from "metabase/components/List";
+import S from "metabase/components/List/List.module.css";
+import ListItem from "metabase/components/ListItem";
 import LoadingAndErrorWrapper from "metabase/components/LoadingAndErrorWrapper";
+import CS from "metabase/css/core/index.css";
+import * as Urls from "metabase/lib/urls";
+import * as metadataActions from "metabase/redux/metadata";
+import { getMetadata } from "metabase/selectors/metadata";
+import visualizations from "metabase/visualizations";
 
 import ReferenceHeader from "../components/ReferenceHeader";
+import { getTable, getMetric } from "../selectors";
+import { getQuestionUrl, getDescription } from "../utils";
 
-import { getQuestionUrl } from "../utils";
-
-import {
-  getMetricQuestions,
-  getError,
-  getLoading,
-  getTable,
-  getMetric,
-} from "../selectors";
-
-import * as metadataActions from "metabase/redux/metadata";
-
-const emptyStateData = (table, metric) => {
+const emptyStateData = (table, metric, metadata) => {
   return {
     message: t`Questions about this metric will appear here as they're added`,
     icon: "all",
@@ -38,6 +29,7 @@ const emptyStateData = (table, metric) => {
       dbId: table && table.db_id,
       tableId: metric.table_id,
       metricId: metric.id,
+      metadata,
     }),
   };
 };
@@ -45,76 +37,67 @@ const emptyStateData = (table, metric) => {
 const mapStateToProps = (state, props) => ({
   metric: getMetric(state, props),
   table: getTable(state, props),
-  entities: getMetricQuestions(state, props),
-  loading: getLoading(state, props),
-  loadingError: getError(state, props),
+  metadata: getMetadata(state),
 });
 
 const mapDispatchToProps = {
   ...metadataActions,
 };
 
-class MetricQuestions extends Component {
-  static propTypes = {
-    style: PropTypes.object.isRequired,
-    entities: PropTypes.object.isRequired,
-    loading: PropTypes.bool,
-    loadingError: PropTypes.object,
-    metric: PropTypes.object,
-    table: PropTypes.object,
-  };
+export const MetricQuestions = ({ style, table, metric, metadata }) => {
+  const {
+    data = [],
+    isLoading,
+    error,
+  } = useQuestionListQuery({
+    query: { f: "using_metric", model_id: metric.id },
+  });
 
-  render() {
-    const { entities, style, loadingError, loading } = this.props;
+  return (
+    <div style={style} className={CS.full}>
+      <ReferenceHeader
+        name={t`Questions about ${metric.name}`}
+        type="questions"
+        headerIcon="ruler"
+      />
+      <LoadingAndErrorWrapper loading={!error && isLoading} error={error}>
+        {() =>
+          data.length > 0 ? (
+            <div className={cx(CS.wrapper, CS.wrapperTrim)}>
+              <List>
+                {data.map(
+                  question =>
+                    question.id() &&
+                    question.displayName() && (
+                      <ListItem
+                        key={question.id()}
+                        name={question.displayName()}
+                        description={getDescription(question)}
+                        url={Urls.question(question.card())}
+                        icon={visualizations.get(question.display()).iconName}
+                      />
+                    ),
+                )}
+              </List>
+            </div>
+          ) : (
+            <div className={S.empty}>
+              <AdminAwareEmptyState
+                {...emptyStateData(table, metric, metadata)}
+              />
+            </div>
+          )
+        }
+      </LoadingAndErrorWrapper>
+    </div>
+  );
+};
 
-    return (
-      <div style={style} className="full">
-        <ReferenceHeader
-          name={t`Questions about ${this.props.metric.name}`}
-          type="questions"
-          headerIcon="ruler"
-        />
-        <LoadingAndErrorWrapper
-          loading={!loadingError && loading}
-          error={loadingError}
-        >
-          {() =>
-            Object.keys(entities).length > 0 ? (
-              <div className="wrapper wrapper--trim">
-                <List>
-                  {Object.values(entities).map(
-                    (entity, index) =>
-                      entity &&
-                      entity.id &&
-                      entity.name && (
-                        <li className="relative" key={entity.id}>
-                          <ListItem
-                            id={entity.id}
-                            index={index}
-                            name={entity.display_name || entity.name}
-                            description={t`Created ${moment(
-                              entity.created_at,
-                            ).fromNow()} by ${entity.creator.common_name}`}
-                            url={Urls.question(entity)}
-                            icon={visualizations.get(entity.display).iconName}
-                          />
-                        </li>
-                      ),
-                  )}
-                </List>
-              </div>
-            ) : (
-              <div className={S.empty}>
-                <AdminAwareEmptyState
-                  {...emptyStateData(this.props.table, this.props.metric)}
-                />
-              </div>
-            )
-          }
-        </LoadingAndErrorWrapper>
-      </div>
-    );
-  }
-}
+MetricQuestions.propTypes = {
+  table: PropTypes.object,
+  style: PropTypes.object.isRequired,
+  metric: PropTypes.object.isRequired,
+  metadata: PropTypes.object.isRequired,
+};
 
 export default connect(mapStateToProps, mapDispatchToProps)(MetricQuestions);

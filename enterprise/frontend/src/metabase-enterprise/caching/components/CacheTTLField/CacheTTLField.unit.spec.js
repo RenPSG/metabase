@@ -1,7 +1,7 @@
-import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { CacheTTLField } from "./CacheTTLField";
+
+import CacheTTLField from "./CacheTTLField";
 
 function setup({ name = "cache_ttl", message, value }) {
   const onChange = jest.fn();
@@ -40,23 +40,23 @@ describe("CacheTTLField", () => {
 
   it("displays message", () => {
     setup({ message: "Cache results for" });
-    expect(screen.queryByText("Cache results for")).toBeInTheDocument();
+    expect(screen.getByText("Cache results for")).toBeInTheDocument();
   });
 
-  it("calls onChange correctly", () => {
+  it("calls onChange correctly", async () => {
     const { field, onChange } = setup({ value: 4 });
 
-    userEvent.clear(field);
-    userEvent.type(field, "14");
+    await userEvent.clear(field);
+    await userEvent.type(field, "14");
     field.blur();
 
     expect(onChange).toHaveBeenLastCalledWith(14);
   });
 
-  it("calls onChange with null value if input is cleared", () => {
+  it("calls onChange with null value if input is cleared", async () => {
     const { field, onChange } = setup({ value: 4 });
 
-    userEvent.clear(field);
+    await userEvent.clear(field);
     field.blur();
 
     expect(onChange).toHaveBeenLastCalledWith(null);

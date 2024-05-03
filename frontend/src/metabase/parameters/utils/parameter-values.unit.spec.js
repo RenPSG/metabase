@@ -1,9 +1,6 @@
 import {
-  getValuePopulatedParameters,
   getParameterValueFromQueryParams,
   getParameterValuesByIdFromQueryParams,
-  getParameterValuesBySlug,
-  normalizeParameterValue,
 } from "./parameter-values";
 
 describe("parameters/utils/parameter-values", () => {
@@ -11,13 +8,11 @@ describe("parameters/utils/parameter-values", () => {
   let field2;
   let field3;
   let field4;
-  let metadata;
   let parameter1;
   let parameter2;
   let parameter3;
   let parameter4;
   let parameters;
-  let parameterValues;
   let queryParams;
   beforeEach(() => {
     field1 = {
@@ -47,26 +42,6 @@ describe("parameters/utils/parameter-values", () => {
       isNumeric: () => false,
       isDate: () => false,
       isBoolean: () => false,
-    };
-
-    metadata = {
-      field(id) {
-        return this.fields[id];
-      },
-      fields: {
-        [field1.id]: field1,
-        [field2.id]: field2,
-        [field3.id]: field3,
-        [field4.id]: field4,
-      },
-      table(id) {
-        return this.tables[id];
-      },
-      tables: {
-        1: {
-          id: 1,
-        },
-      },
     };
 
     // found in queryParams and not defaulted
@@ -100,85 +75,49 @@ describe("parameters/utils/parameter-values", () => {
       bar: "parameter2 queryParam value",
       valueNotFoundInParameters: "nonexistent parameter queryParam value",
     };
-
-    // typically generated using getParameterValuesByIdFromQueryParams(parameters, queryParams)
-    parameterValues = {
-      [parameter1.id]: "parameter1 parameterValue",
-      [parameter2.id]: "parameter2 parameterValue",
-      [parameter3.id]: "parameter3 default value",
-    };
-  });
-
-  describe("getValuePopulatedParameters", () => {
-    it("should return an array of parameter objects with the `value` property set if it exists in the given `parameterValues` id, value map", () => {
-      expect(
-        getValuePopulatedParameters(parameters, {
-          [parameter1.id]: "parameter1 value",
-          [parameter2.id]: "parameter2 value",
-        }),
-      ).toEqual([
-        {
-          ...parameter1,
-          value: "parameter1 value",
-        },
-        {
-          ...parameter2,
-          value: "parameter2 value",
-        },
-        parameter3,
-        parameter4,
-      ]);
-    });
-
-    it("should handle there being an undefined or null parameterValues object", () => {
-      expect(getValuePopulatedParameters(parameters, undefined)).toEqual(
-        parameters,
-      );
-      expect(getValuePopulatedParameters(parameters, null)).toEqual(parameters);
-    });
   });
 
   describe("getParameterValueFromQueryParams", () => {
-    it("should return undefined when given an undefined queryParams arg", () => {
-      expect(
-        getParameterValueFromQueryParams(parameter1, undefined, metadata),
-      ).toBe(undefined);
+    it("should return null when given an undefined queryParams arg", () => {
+      expect(getParameterValueFromQueryParams(parameter1, undefined)).toBe(
+        null,
+      );
     });
 
     it("should return the parameter's default value when given an undefined queryParams arg", () => {
-      expect(
-        getParameterValueFromQueryParams(parameter2, undefined, metadata),
-      ).toBe("parameter2 default value");
+      expect(getParameterValueFromQueryParams(parameter2, undefined)).toBe(
+        "parameter2 default value",
+      );
     });
 
     it("should return the parameter's default value when the parameter value is not found in queryParams", () => {
-      expect(
-        getParameterValueFromQueryParams(parameter3, queryParams, metadata),
-      ).toBe("parameter3 default value");
+      expect(getParameterValueFromQueryParams(parameter3, queryParams)).toBe(
+        "parameter3 default value",
+      );
+    });
+
+    it("should return null when the parameter is not in queryParams and has no default", () => {
+      expect(getParameterValueFromQueryParams(parameter1, {})).toBe(null);
     });
 
     it("should return the parameter value found in the queryParams object", () => {
-      expect(
-        getParameterValueFromQueryParams(parameter1, queryParams, metadata),
-      ).toEqual(["parameter1 queryParam value"]);
+      expect(getParameterValueFromQueryParams(parameter1, queryParams)).toEqual(
+        ["parameter1 queryParam value"],
+      );
     });
 
     it("should ignore the parameter's default value when the parameter value is found in queryParams", () => {
-      expect(
-        getParameterValueFromQueryParams(parameter2, queryParams, metadata),
-      ).toEqual(["parameter2 queryParam value"]);
+      expect(getParameterValueFromQueryParams(parameter2, queryParams)).toEqual(
+        ["parameter2 queryParam value"],
+      );
     });
 
-    it("should return an empty string as the value for a defaulted parameter because we handle that special case elsewhere", () => {
+    it("should return null as the value for a defaulted parameter because we handle that special case elsewhere", () => {
       expect(
-        getParameterValueFromQueryParams(
-          parameter2,
-          {
-            [parameter2.slug]: "",
-          },
-          metadata,
-        ),
-      ).toBe("");
+        getParameterValueFromQueryParams(parameter2, {
+          [parameter2.slug]: "",
+        }),
+      ).toBe(null);
     });
 
     it("should parse the parameter value as a float if all associated fields are numeric and not dates", () => {
@@ -189,41 +128,16 @@ describe("parameters/utils/parameter-values", () => {
       field4.isDate = () => false;
 
       expect(
-        getParameterValueFromQueryParams(
-          parameter1,
-          {
-            [parameter1.slug]: "123.456",
-          },
-          metadata,
-        ),
+        getParameterValueFromQueryParams(parameter1, {
+          [parameter1.slug]: "123.456",
+        }),
       ).toEqual([123.456]);
 
       expect(
-        getParameterValueFromQueryParams(
-          parameter1,
-          {
-            [parameter1.slug]: "",
-          },
-          metadata,
-        ),
-      ).toBe("");
-    });
-
-    it("should parse the parameter value as a float when it is a number parameter without fields", () => {
-      const numberParameter = {
-        id: 111,
-        slug: "numberParameter",
-        type: "number/=",
-      };
-      expect(
-        getParameterValueFromQueryParams(
-          numberParameter,
-          {
-            [numberParameter.slug]: "123.456",
-          },
-          metadata,
-        ),
-      ).toEqual([123.456]);
+        getParameterValueFromQueryParams(parameter1, {
+          [parameter1.slug]: "",
+        }),
+      ).toBe(null);
     });
 
     it("should not parse numeric values that are dates as floats", () => {
@@ -234,13 +148,9 @@ describe("parameters/utils/parameter-values", () => {
       field4.isDate = () => false;
 
       expect(
-        getParameterValueFromQueryParams(
-          parameter1,
-          {
-            [parameter1.slug]: "123.456",
-          },
-          metadata,
-        ),
+        getParameterValueFromQueryParams(parameter1, {
+          [parameter1.slug]: "123.456",
+        }),
       ).toEqual(["123.456"]);
     });
 
@@ -249,113 +159,77 @@ describe("parameters/utils/parameter-values", () => {
       field4.isBoolean = () => true;
 
       expect(
-        getParameterValueFromQueryParams(
-          parameter1,
-          {
-            [parameter1.slug]: "true",
-          },
-          metadata,
-        ),
+        getParameterValueFromQueryParams(parameter1, {
+          [parameter1.slug]: "true",
+        }),
       ).toEqual([true]);
 
       expect(
-        getParameterValueFromQueryParams(
-          parameter1,
-          {
-            [parameter1.slug]: "false",
-          },
-          metadata,
-        ),
+        getParameterValueFromQueryParams(parameter1, {
+          [parameter1.slug]: "false",
+        }),
       ).toEqual([false]);
 
       expect(
-        getParameterValueFromQueryParams(
-          parameter1,
-          {
-            [parameter1.slug]: "",
-          },
-          metadata,
-        ),
-      ).toBe("");
+        getParameterValueFromQueryParams(parameter1, {
+          [parameter1.slug]: "",
+        }),
+      ).toBe(null);
 
       expect(
-        getParameterValueFromQueryParams(
-          parameter1,
-          {
-            [parameter1.slug]: "foo",
-          },
-          metadata,
-        ),
+        getParameterValueFromQueryParams(parameter1, {
+          [parameter1.slug]: "foo",
+        }),
       ).toEqual(["foo"]);
     });
 
     it("should not normalize date parameters", () => {
       parameter1.type = "date/foo";
-      parameter1.hasOnlyFieldTargets = true;
+      parameter1.hasVariableTemplateTagTarget = false;
 
       expect(
-        getParameterValueFromQueryParams(
-          parameter1,
-          {
-            [parameter1.slug]: "123",
-          },
-          metadata,
-        ),
+        getParameterValueFromQueryParams(parameter1, {
+          [parameter1.slug]: "123",
+        }),
       ).toEqual("123");
     });
 
     it("should not normalize parameters mapped to non-field targets", () => {
       parameter1.type = "category";
-      parameter1.hasOnlyFieldTargets = false;
+      parameter1.hasVariableTemplateTagTarget = true;
 
       expect(
-        getParameterValueFromQueryParams(
-          parameter1,
-          {
-            [parameter1.slug]: "foo",
-          },
-          metadata,
-        ),
+        getParameterValueFromQueryParams(parameter1, {
+          [parameter1.slug]: "foo",
+        }),
       ).toEqual(["foo"]);
     });
 
     it("should not normalize empty string parameter values", () => {
       parameter1.type = "category";
-      parameter1.hasOnlyFieldTargets = true;
+      parameter1.hasVariableTemplateTagTarget = false;
 
       expect(
-        getParameterValueFromQueryParams(
-          parameter1,
-          {
-            [parameter1.slug]: "",
-          },
-          metadata,
-        ),
-      ).toBe("");
+        getParameterValueFromQueryParams(parameter1, {
+          [parameter1.slug]: "",
+        }),
+      ).toBe(null);
     });
 
     it("should normalize non-date parameters mapped only to field targets", () => {
       parameter1.type = "category";
-      parameter1.hasOnlyFieldTargets = true;
+      parameter1.hasVariableTemplateTagTarget = false;
 
       expect(
-        getParameterValueFromQueryParams(
-          parameter1,
-          {
-            [parameter1.slug]: "foo",
-          },
-          metadata,
-        ),
+        getParameterValueFromQueryParams(parameter1, {
+          [parameter1.slug]: "foo",
+        }),
       ).toEqual(["foo"]);
 
       expect(
-        getParameterValueFromQueryParams(
-          parameter1,
-          {
-            [parameter1.slug]: ["foo", "bar"],
-          },
-          metadata,
-        ),
+        getParameterValueFromQueryParams(parameter1, {
+          [parameter1.slug]: ["foo", "bar"],
+        }),
       ).toEqual(["foo", "bar"]);
     });
 
@@ -363,25 +237,17 @@ describe("parameters/utils/parameter-values", () => {
       field3.isBoolean = () => true;
 
       expect(
-        getParameterValueFromQueryParams(
-          parameter3,
-          {
-            [parameter3.slug]: "true",
-          },
-          metadata,
-        ),
+        getParameterValueFromQueryParams(parameter3, {
+          [parameter3.slug]: "true",
+        }),
       ).toEqual([true]);
     });
 
     it("should not try to parse parameters without fields", () => {
       expect(
-        getParameterValueFromQueryParams(
-          parameter4,
-          {
-            [parameter4.slug]: "true",
-          },
-          metadata,
-        ),
+        getParameterValueFromQueryParams(parameter4, {
+          [parameter4.slug]: "true",
+        }),
       ).toEqual(["true"]);
     });
 
@@ -390,135 +256,159 @@ describe("parameters/utils/parameter-values", () => {
       field2.isDate = () => false;
 
       expect(
-        getParameterValueFromQueryParams(
-          parameter2,
-          {
-            [parameter2.slug]: "parameter2 default value",
-          },
-          metadata,
-        ),
+        getParameterValueFromQueryParams(parameter2, {
+          [parameter2.slug]: "parameter2 default value",
+        }),
       ).toEqual([NaN]);
 
-      expect(getParameterValueFromQueryParams(parameter2, {}, metadata)).toBe(
+      expect(getParameterValueFromQueryParams(parameter2, {})).toBe(
         "parameter2 default value",
       );
+    });
+
+    describe("for number filter type", () => {
+      const numberParameter = {
+        id: 111,
+        slug: "numberParameter",
+        type: "number/=",
+      };
+
+      const runGetParameterValueFromQueryParams = value =>
+        getParameterValueFromQueryParams(numberParameter, {
+          [numberParameter.slug]: value,
+        });
+
+      it("should parse the parameter value as a float when it is a number parameter without fields", () => {
+        expect(runGetParameterValueFromQueryParams("123.456")).toEqual([
+          123.456,
+        ]);
+      });
+
+      describe("when parsing parameter value that is a comma-separated list of numbers", () => {
+        it("should return list when every item is a number", () => {
+          expect(runGetParameterValueFromQueryParams("1,,2,3,4")).toEqual([
+            "1,2,3,4",
+          ]);
+          expect(runGetParameterValueFromQueryParams("1, ,2,3,4")).toEqual([
+            "1,2,3,4",
+          ]);
+          expect(runGetParameterValueFromQueryParams(",1,2,3,")).toEqual([
+            "1,2,3",
+          ]);
+        });
+
+        it("should return undefined when list is not formatted properly", () => {
+          expect(runGetParameterValueFromQueryParams(",,,")).toEqual([
+            undefined,
+          ]);
+          expect(runGetParameterValueFromQueryParams(" ")).toEqual([undefined]);
+        });
+
+        it("should return first parseable float if value includes non-numeric characters", () => {
+          expect(runGetParameterValueFromQueryParams("1,a,3,")).toEqual([1]);
+          expect(runGetParameterValueFromQueryParams("1a,b,3,")).toEqual([1]);
+        });
+      });
     });
   });
 
   describe("getParameterValuesByIdFromQueryParams", () => {
-    describe("`forcefullyUnsetDefaultedParametersWithEmptyStringValue` === false", () => {
-      it("should generate a map of parameter values found in the queryParams or with default values", () => {
-        expect(
-          getParameterValuesByIdFromQueryParams(
-            parameters,
-            queryParams,
-            metadata,
-          ),
-        ).toEqual({
-          [parameter1.id]: ["parameter1 queryParam value"],
-          [parameter2.id]: ["parameter2 queryParam value"],
-          [parameter3.id]: "parameter3 default value",
-        });
-      });
-
-      it("should handle an undefined queryParams", () => {
-        expect(
-          getParameterValuesByIdFromQueryParams(
-            parameters,
-            undefined,
-            metadata,
-          ),
-        ).toEqual({
-          [parameter2.id]: "parameter2 default value",
-          [parameter3.id]: "parameter3 default value",
-        });
-      });
-
-      it("should treat special cased defaulted parameters + empty string value as NIL and use the defaulted value", () => {
-        const queryParamsWithSpecialCase = {
-          ...queryParams,
-          [parameter1.slug]: "", // this parameter has no default
-          [parameter2.slug]: "", // this parameter has a default
-        };
-
-        expect(
-          getParameterValuesByIdFromQueryParams(
-            parameters,
-            queryParamsWithSpecialCase,
-            metadata,
-            { forcefullyUnsetDefaultedParametersWithEmptyStringValue: false },
-          ),
-        ).toEqual({
-          [parameter2.id]: "parameter2 default value",
-          [parameter3.id]: "parameter3 default value",
-        });
-
-        expect(
-          getParameterValuesByIdFromQueryParams(
-            parameters,
-            queryParamsWithSpecialCase,
-            metadata,
-          ),
-        ).toEqual(
-          getParameterValuesByIdFromQueryParams(
-            parameters,
-            queryParamsWithSpecialCase,
-            metadata,
-            { forcefullyUnsetDefaultedParametersWithEmptyStringValue: false },
-          ),
-        );
-      });
-
-      it("should not filter out falsy non-nil values", () => {
-        field1.isNumeric = () => true;
-        field4.isNumeric = () => true;
-
-        field3.isBoolean = () => true;
-
-        expect(
-          getParameterValuesByIdFromQueryParams(
-            parameters,
-            {
-              [parameter1.slug]: "0",
-              [parameter2.slug]: "parameter2 foo value",
-              [parameter3.slug]: "false",
-            },
-            metadata,
-            { forcefullyUnsetDefaultedParametersWithEmptyStringValue: false },
-          ),
-        ).toEqual({
-          [parameter1.id]: [0],
-          [parameter2.id]: ["parameter2 foo value"],
-          [parameter3.id]: [false],
-        });
+    it("should generate a map of all parameter values, including those in the queryParams or with default values", () => {
+      expect(
+        getParameterValuesByIdFromQueryParams(parameters, queryParams),
+      ).toEqual({
+        [parameter1.id]: ["parameter1 queryParam value"],
+        [parameter2.id]: ["parameter2 queryParam value"],
+        [parameter3.id]: "parameter3 default value",
+        [parameter4.id]: null,
       });
     });
 
-    describe("`forcefullyUnsetDefaultedParametersWithEmptyStringValue` === true", () => {
-      it("should remove defaulted parameters set to '' from the output", () => {
-        const queryParamsWithSpecialCase = {
-          ...queryParams,
-          [parameter1.slug]: "", // this parameter has no default
-          [parameter2.slug]: "", // this parameter has a default
-        };
+    it("should handle an undefined queryParams", () => {
+      expect(
+        getParameterValuesByIdFromQueryParams(parameters, undefined),
+      ).toEqual({
+        [parameter1.id]: null,
+        [parameter2.id]: "parameter2 default value",
+        [parameter3.id]: "parameter3 default value",
+        [parameter4.id]: null,
+      });
+    });
 
-        expect(
-          getParameterValuesByIdFromQueryParams(
-            parameters,
-            queryParamsWithSpecialCase,
-            metadata,
-            { forcefullyUnsetDefaultedParametersWithEmptyStringValue: true },
-          ),
-        ).toEqual({
-          [parameter3.id]: "parameter3 default value",
-        });
+    it("should treat special cased defaulted parameters + empty string value as NIL and use the defaulted value", () => {
+      const queryParamsWithSpecialCase = {
+        ...queryParams,
+        [parameter1.slug]: "", // this parameter has no default
+        [parameter2.slug]: "", // this parameter has a default
+      };
+
+      expect(
+        getParameterValuesByIdFromQueryParams(
+          parameters,
+          queryParamsWithSpecialCase,
+        ),
+      ).toEqual({
+        [parameter1.id]: null, // no default and empty string value
+        [parameter2.id]: null, // has default and empty string value
+        [parameter3.id]: "parameter3 default value", // has default and no empty string value
+        [parameter4.id]: null, // no default and no empty string value
+      });
+
+      expect(
+        getParameterValuesByIdFromQueryParams(
+          parameters,
+          queryParamsWithSpecialCase,
+        ),
+      ).toEqual(
+        getParameterValuesByIdFromQueryParams(
+          parameters,
+          queryParamsWithSpecialCase,
+        ),
+      );
+    });
+
+    it("should not filter out falsy non-nil values", () => {
+      field1.isNumeric = () => true;
+      field4.isNumeric = () => true;
+      field3.isBoolean = () => true;
+
+      expect(
+        getParameterValuesByIdFromQueryParams(parameters, {
+          [parameter1.slug]: "0",
+          [parameter2.slug]: "parameter2 foo value",
+          [parameter3.slug]: "false",
+        }),
+      ).toEqual({
+        [parameter1.id]: [0],
+        [parameter2.id]: ["parameter2 foo value"],
+        [parameter3.id]: [false],
+        [parameter4.id]: null,
+      });
+    });
+
+    it("should have null values for defaulted parameters set to ''", () => {
+      const queryParamsWithSpecialCase = {
+        ...queryParams,
+        [parameter1.slug]: "", // this parameter has no default
+        [parameter2.slug]: "", // this parameter has a default
+      };
+
+      expect(
+        getParameterValuesByIdFromQueryParams(
+          parameters,
+          queryParamsWithSpecialCase,
+        ),
+      ).toEqual({
+        [parameter1.id]: null,
+        [parameter2.id]: null,
+        [parameter3.id]: "parameter3 default value",
+        [parameter4.id]: null,
       });
     });
 
     it("should not filter out falsy non-nil, non-empty-string values", () => {
       field1.isNumeric = () => true;
       field4.isNumeric = () => true;
-
       field3.isBoolean = () => true;
 
       expect(
@@ -529,159 +419,14 @@ describe("parameters/utils/parameter-values", () => {
             [parameter2.slug]: "",
             [parameter3.slug]: "false",
           },
-          metadata,
           { forcefullyUnsetDefaultedParametersWithEmptyStringValue: true },
         ),
       ).toEqual({
         [parameter1.id]: [0],
+        [parameter2.id]: null,
         [parameter3.id]: [false],
+        [parameter4.id]: null,
       });
-    });
-  });
-
-  describe("getParameterValuesBySlug", () => {
-    describe("`preserveDefaultedParameters` === false", () => {
-      it("should return a map of defined parameter values keyed by the parameter's slug", () => {
-        expect(getParameterValuesBySlug(parameters, parameterValues)).toEqual({
-          [parameter1.slug]: "parameter1 parameterValue",
-          [parameter2.slug]: "parameter2 parameterValue",
-          [parameter3.slug]: "parameter3 default value",
-        });
-      });
-
-      it("should prioritize values found on the parameter object over the parameterValues map", () => {
-        const valuePopulatedParameter1 = {
-          ...parameter1,
-          value: "parameter1 value prop",
-        };
-        const parameters = [valuePopulatedParameter1, parameter2];
-
-        expect(getParameterValuesBySlug(parameters, parameterValues)).toEqual({
-          [parameter1.slug]: "parameter1 value prop", // was set on parameter object
-          [parameter2.slug]: "parameter2 parameterValue", // was NOT set on parameter object, found on parameterValues
-        });
-      });
-
-      it("should handle an undefined parameterValues map", () => {
-        expect(getParameterValuesBySlug(parameters, undefined)).toEqual({});
-        expect(
-          getParameterValuesBySlug([
-            {
-              ...parameter1,
-              value: "parameter1 value prop",
-            },
-          ]),
-        ).toEqual({
-          [parameter1.slug]: "parameter1 value prop",
-        });
-      });
-
-      it("should remove any properties with nil values from the map", () => {
-        const defaultedParameter = {
-          id: 999,
-          slug: "abc",
-          default: 123,
-        };
-
-        const defaultedParameterWithValue = {
-          id: 888,
-          slug: "def",
-          default: 456,
-          value: 789,
-        };
-
-        const parameters = [defaultedParameter, defaultedParameterWithValue];
-
-        expect(getParameterValuesBySlug(parameters, {})).toEqual({
-          [defaultedParameterWithValue.slug]: defaultedParameterWithValue.value,
-        });
-
-        expect(
-          getParameterValuesBySlug(
-            parameters,
-            {},
-            { preserveDefaultedParameters: false },
-          ),
-        ).toEqual(getParameterValuesBySlug(parameters, parameterValues));
-      });
-
-      it("should handle nullish parameters", () => {
-        expect(getParameterValuesBySlug(undefined, {})).toEqual({});
-        expect(getParameterValuesBySlug(null, {})).toEqual({});
-      });
-    });
-
-    describe("`preserveDefaultedParameters` === true", () => {
-      it("should keep defaulted parameters with nil values in the outputted map", () => {
-        const defaultedParameter = {
-          id: 999,
-          slug: "abc",
-          default: 123,
-        };
-
-        const defaultedParameterWithValue = {
-          id: 888,
-          slug: "def",
-          default: 456,
-          value: 789,
-        };
-
-        const parameters = [defaultedParameter, defaultedParameterWithValue];
-
-        expect(
-          getParameterValuesBySlug(parameters, parameterValues, {
-            preserveDefaultedParameters: true,
-          }),
-        ).toEqual({
-          [defaultedParameter.slug]: undefined,
-          [defaultedParameterWithValue.slug]: defaultedParameterWithValue.value,
-        });
-      });
-
-      it("should handle nullish parameters", () => {
-        expect(
-          getParameterValuesBySlug(
-            undefined,
-            {},
-            {
-              preserveDefaultedParameters: true,
-            },
-          ),
-        ).toEqual({});
-
-        expect(
-          getParameterValuesBySlug(
-            null,
-            {},
-            {
-              preserveDefaultedParameters: true,
-            },
-          ),
-        ).toEqual({});
-      });
-    });
-  });
-
-  describe("normalizeParameterValue", () => {
-    it("should return same value for location/category parameters", () => {
-      expect(normalizeParameterValue("category", "foo")).toEqual("foo");
-      expect(normalizeParameterValue("location/city", "bar")).toEqual("bar");
-    });
-
-    it("should return same value for date parameters", () => {
-      expect(normalizeParameterValue("date/single", "foo")).toEqual("foo");
-    });
-
-    it("should return normalized value for string parameters", () => {
-      expect(normalizeParameterValue("string/contains", "foo")).toEqual([
-        "foo",
-      ]);
-      expect(normalizeParameterValue("string/contains")).toEqual([]);
-    });
-
-    it("should return normalized value for number parameters", () => {
-      expect(normalizeParameterValue("number/=", 0)).toEqual([0]);
-      expect(normalizeParameterValue("number/=", null)).toEqual([]);
     });
   });
 });

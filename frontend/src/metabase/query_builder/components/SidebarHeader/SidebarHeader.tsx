@@ -1,18 +1,20 @@
-import React from "react";
 import { t } from "ttag";
-import Icon from "metabase/components/Icon";
+
+import type { IconName } from "metabase/ui";
+import { Icon } from "metabase/ui";
+
+import type { HeaderTitleContainerVariant } from "./SidebarHeader.styled";
 import {
   HeaderRoot,
   HeaderIcon,
   HeaderTitleContainer,
-  HeaderTitleContainerVariant,
   CloseButton,
 } from "./SidebarHeader.styled";
 
 type Props = {
   className?: string;
   title?: string;
-  icon?: string;
+  icon?: IconName;
   onBack?: () => void;
   onClose?: () => void;
 };
@@ -41,12 +43,15 @@ function SidebarHeader({ className, title, icon, onBack, onClose }: Props) {
     hasOnBackHandler: !!onBack,
   });
 
-  const hasHeaderIcon = onBack || icon;
-
   return (
     <HeaderRoot className={className}>
-      <HeaderTitleContainer variant={headerVariant} onClick={onBack}>
-        {hasHeaderIcon && <HeaderIcon name={icon || "chevronleft"} />}
+      <HeaderTitleContainer
+        variant={headerVariant}
+        onClick={onBack}
+        data-testid="sidebar-header-title"
+      >
+        {onBack && <HeaderIcon name="chevronleft" />}
+        {icon && <HeaderIcon name={icon} />}
         {hasDefaultBackButton ? t`Back` : title}
       </HeaderTitleContainer>
       {onClose && (
@@ -58,4 +63,5 @@ function SidebarHeader({ className, title, icon, onBack, onClose }: Props) {
   );
 }
 
-export default SidebarHeader;
+// eslint-disable-next-line import/no-default-export -- deprecated usage
+export default Object.assign(SidebarHeader, { Root: HeaderRoot });

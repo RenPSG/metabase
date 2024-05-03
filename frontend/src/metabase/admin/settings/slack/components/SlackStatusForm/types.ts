@@ -1,4 +1,4 @@
-import { ComponentType } from "react";
+import type { ComponentType } from "react";
 
 export interface FormProps {
   Form: ComponentType;
@@ -7,4 +7,5 @@ export interface FormProps {
 
 export interface FormFieldProps {
   name: string;
+  description?: string;
 }

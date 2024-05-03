@@ -1,7 +1,7 @@
-import React from "react";
-import { ComponentStory } from "@storybook/react";
-import { useArgs } from "@storybook/client-api";
-import TextWidget from "./TextWidget";
+import { useArgs } from "@storybook/addons";
+import type { ComponentStory } from "@storybook/react";
+
+import { TextWidget } from "./TextWidget";
 
 export default {
   title: "Parameters/TextWidget",
@@ -11,7 +11,7 @@ export default {
 const Template: ComponentStory<typeof TextWidget> = args => {
   const [{ value }, updateArgs] = useArgs();
 
-  const setValue = (value: string | null) => {
+  const setValue = (value: string | number | null) => {
     updateArgs({ value });
   };
 

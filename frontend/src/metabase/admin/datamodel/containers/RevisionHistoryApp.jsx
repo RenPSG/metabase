@@ -1,13 +1,13 @@
 /* eslint-disable react/prop-types */
-import React, { Component } from "react";
+import { Component } from "react";
 import { connect } from "react-redux";
 
-import RevisionHistory from "../components/revisions/RevisionHistory";
 import Metrics from "metabase/entities/metrics";
 import Segments from "metabase/entities/segments";
 
-import { getRevisions, getCurrentUser } from "../selectors";
+import RevisionHistory from "../components/revisions/RevisionHistory";
 import { fetchRevisions } from "../datamodel";
+import { getRevisions, getCurrentUser } from "../selectors";
 
 const mapStateToProps = (state, props) => ({
   objectType: props.params.entity,

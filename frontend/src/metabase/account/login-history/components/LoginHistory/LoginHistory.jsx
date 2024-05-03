@@ -1,38 +1,39 @@
 /* eslint-disable react/prop-types */
-import React from "react";
-import _ from "underscore";
-import moment from "moment";
+import cx from "classnames";
+import moment from "moment-timezone"; // eslint-disable-line no-restricted-imports -- deprecated usage
 import { t } from "ttag";
+import _ from "underscore";
 
+import NoResults from "assets/img/no_results.svg";
 import Card from "metabase/components/Card";
+import EmptyState from "metabase/components/EmptyState";
 import Label from "metabase/components/type/Label";
 import Text from "metabase/components/type/Text";
-import EmptyState from "metabase/components/EmptyState";
-import NoResults from "assets/img/no_results.svg";
+import CS from "metabase/css/core/index.css";
 
 import {
+  LoginActiveLabel,
   LoginGroup,
   LoginItemContent,
   LoginItemInfo,
 } from "./LoginHistory.styled";
 
-const LoginHistoryItem = item => (
-  <Card py={1} px="20px" my={2}>
+const LoginHistoryItem = ({ item }) => (
+  <Card
+    className={cx(CS.my2, CS.py1)}
+    style={{ paddingLeft: 20, paddingRight: 20 }}
+  >
     <LoginItemContent>
       <div>
         <Label mb="0">
           {item.location} -{" "}
-          <span className="text-medium">{item.ip_address}</span>
+          <span className={CS.textMedium}>{item.ip_address}</span>
         </Label>
-        <Text color="medium" mt="-2px">
-          {item.device_description}
-        </Text>
+        <Text style={{ marginTop: -8 }}>{item.device_description}</Text>
       </div>
       <LoginItemInfo>
         {item.active && (
-          <Label pr={2} className="text-data">
-            Active
-          </Label>
+          <LoginActiveLabel className={CS.pr2}>{t`Active`}</LoginActiveLabel>
         )}
         <Label>{item.time}</Label>
       </LoginItemInfo>
@@ -40,10 +41,14 @@ const LoginHistoryItem = item => (
   </Card>
 );
 
-const LoginHistoryGroup = (items, date) => (
+const LoginHistoryGroup = ({ items, date }) => (
   <LoginGroup>
     <Label>{date}</Label>
-    <div>{items.map(LoginHistoryItem)}</div>
+    <div>
+      {items.map(item => (
+        <LoginHistoryItem key={item.timestamp} item={item} />
+      ))}
+    </div>
   </LoginGroup>
 );
 
@@ -53,8 +58,9 @@ const formatItems = items =>
     return {
       ...item,
       date: parsedTimestamp.format("LL"),
-      time: `${parsedTimestamp.format("LT")} (${item.timezone ||
-        parsedTimestamp.format("Z")})`,
+      time: `${parsedTimestamp.format("LT")} (${
+        item.timezone || parsedTimestamp.format("Z")
+      })`,
     };
   });
 
@@ -71,7 +77,13 @@ function LoginHistoryList({ loginHistory }) {
     );
   }
 
-  return <div>{_.map(groups, LoginHistoryGroup)}</div>;
+  return (
+    <div>
+      {_.map(groups, (items, date) => (
+        <LoginHistoryGroup items={items} date={date} key={date} />
+      ))}
+    </div>
+  );
 }
 
 export default LoginHistoryList;

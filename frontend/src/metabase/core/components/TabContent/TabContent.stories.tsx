@@ -1,10 +1,11 @@
-import React from "react";
-import { ComponentStory } from "@storybook/react";
-import { useArgs } from "@storybook/client-api";
+import { useArgs } from "@storybook/addons";
+import type { ComponentStory } from "@storybook/react";
+
 import Tab from "../Tab";
-import TabContent from "./TabContent";
 import TabList from "../TabList";
 import TabPanel from "../TabPanel";
+
+import TabContent from "./TabContent";
 
 export default {
   title: "Core/TabContent",

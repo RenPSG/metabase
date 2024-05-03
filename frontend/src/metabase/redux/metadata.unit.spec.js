@@ -1,6 +1,8 @@
-import Fields from "metabase/entities/fields";
+/* eslint-disable import/order */
 import Tables from "metabase/entities/tables";
-import { fetchField, loadMetadataForQuery } from "./metadata";
+import Fields from "metabase/entities/fields";
+
+import { fetchField, loadMetadataForDependentItems } from "./metadata";
 
 describe("deprecated metadata actions", () => {
   let dispatch;
@@ -44,7 +46,7 @@ describe("deprecated metadata actions", () => {
             result: 0,
             entities: {
               fields: {
-                0: { id: 0, dimensions: { human_readable_field_id: 1 } },
+                0: { id: 0, dimensions: [{ human_readable_field_id: 1 }] },
               },
             },
           },
@@ -58,7 +60,7 @@ describe("deprecated metadata actions", () => {
             result: 1,
             entities: {
               fields: {
-                0: { id: 0, dimensions: { human_readable_field_id: 1 } },
+                0: { id: 0, dimensions: [{ human_readable_field_id: 1 }] },
                 1: { id: 1 },
               },
             },
@@ -79,7 +81,7 @@ describe("deprecated metadata actions", () => {
     });
   });
 
-  describe("loadMetadataForQuery", () => {
+  describe("loadMetadataForDependentItems", () => {
     beforeEach(() => {
       Fields.actions.fetch = jest.fn(() =>
         Promise.resolve({
@@ -104,53 +106,27 @@ describe("deprecated metadata actions", () => {
     });
 
     it("should send requests for any tables/fields needed by the query", () => {
-      const query = {
-        dependentMetadata: () => [
-          {
-            type: "table",
-            id: 1,
-          },
-          {
-            type: "table",
-            id: 1,
-          },
-          {
-            foreignTables: true,
-            type: "table",
-            id: 2,
-          },
-          {
-            type: "field",
-            id: 3,
-          },
-          { type: "card", id: 4 },
-        ],
-      };
+      const dependentItems = [
+        { type: "table", id: 1 },
+        { type: "table", id: 1 },
+        { type: "table", id: 2 },
+        { type: "field", id: 3 },
+      ];
 
-      loadMetadataForQuery(query)(dispatch);
-      expect(Tables.actions.fetchMetadata).toHaveBeenCalledWith({ id: 1 });
+      loadMetadataForDependentItems(dependentItems)(dispatch);
+      expect(Tables.actions.fetchMetadataAndForeignTables).toHaveBeenCalledWith(
+        { id: 1 },
+        undefined,
+      );
+      expect(Tables.actions.fetchMetadataAndForeignTables).toHaveBeenCalledWith(
+        { id: 2 },
+        undefined,
+      );
       expect(
         Tables.actions.fetchMetadataAndForeignTables,
-      ).toHaveBeenCalledWith({ id: 2 });
-      expect(Tables.actions.fetchMetadata.mock.calls.length).toBe(1);
+      ).toHaveBeenCalledTimes(2);
 
-      expect(Fields.actions.fetch).toHaveBeenCalledWith({ id: 3 });
-    });
-
-    it("should load extra dependencies if provided", () => {
-      const query = {
-        dependentMetadata: () => [
-          {
-            type: "table",
-            id: 1,
-          },
-        ],
-      };
-
-      loadMetadataForQuery(query, [{ type: "field", id: 3 }])(dispatch);
-
-      expect(Tables.actions.fetchMetadata).toHaveBeenCalledWith({ id: 1 });
-      expect(Fields.actions.fetch).toHaveBeenCalledWith({ id: 3 });
+      expect(Fields.actions.fetch).toHaveBeenCalledWith({ id: 3 }, undefined);
     });
   });
 });
