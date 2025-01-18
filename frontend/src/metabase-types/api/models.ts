@@ -1,18 +1,28 @@
-import {
+import type {
   BaseUser,
   CardId,
-  CollectionId,
   CollectionAuthorityLevel,
+  CollectionId,
   DatabaseId,
   UserId,
 } from "metabase-types/api";
 
+export type ModelCacheState =
+  | "creating"
+  | "refreshing"
+  | "persisted"
+  | "error"
+  | "deletable"
+  | "off";
+
 export interface ModelCacheRefreshStatus {
   id: number;
-  state: "refreshing" | "persisted" | "error";
+  state: ModelCacheState;
   error: string | null;
   active: boolean;
 
+  card_archived?: boolean;
+  card_type?: "model" | "question" | "metric";
   card_id: CardId;
   card_name: string;
 

@@ -1,25 +1,29 @@
-import React, { FormHTMLAttributes } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMockCollection } from "metabase-types/api/mocks";
-import NewTimelineModal, { NewTimelineModalProps } from "./NewTimelineModal";
 
-const FormMock = (props: FormHTMLAttributes<HTMLFormElement>) => (
-  <form {...props}>
-    <button>Create</button>
-  </form>
-);
+import {
+  createMockCollection,
+  createMockTimelineData,
+} from "metabase-types/api/mocks";
 
-jest.mock("metabase/containers/Form", () => FormMock);
+import type { NewTimelineModalProps } from "./NewTimelineModal";
+import NewTimelineModal from "./NewTimelineModal";
 
 describe("NewTimelineModal", () => {
-  it("should submit modal", () => {
+  it("should submit modal", async () => {
     const props = getProps();
+    const values = createMockTimelineData();
 
     render(<NewTimelineModal {...props} />);
-    userEvent.click(screen.getByText("Create"));
+    await userEvent.type(screen.getByLabelText("Name"), values.name);
+    await waitFor(() => {
+      expect(screen.getByText("Create")).toBeEnabled();
+    });
 
-    expect(props.onSubmit).toHaveBeenCalled();
+    await userEvent.click(screen.getByText("Create"));
+    await waitFor(() => {
+      expect(props.onSubmit).toHaveBeenCalledWith(values, props.collection);
+    });
   });
 });
 

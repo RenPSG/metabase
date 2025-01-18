@@ -1,7 +1,10 @@
 (ns metabase.sync.concurrent
   "Namespace with helpers for concurrent tasks in sync. Intended for quick, one-off tasks like re-syncing a table,
   fingerprinting a field, etc."
-  (:import [java.util.concurrent Callable Executors ExecutorService Future ThreadFactory]))
+  (:import
+   (java.util.concurrent Callable Executors ExecutorService Future ThreadFactory)))
+
+(set! *warn-on-reflection* true)
 
 (defonce ^:private thread-factory
   (reify ThreadFactory
@@ -13,7 +16,7 @@
 (defonce ^:private executor
   (delay (Executors/newFixedThreadPool 1 ^ThreadFactory thread-factory)))
 
-(defn submit-task
+(defn submit-task!
   "Submit a task to the single thread executor. This will attempt to serialize repeated requests to sync tables. It
   obviously cannot work across multiple instances."
   ^Future [^Callable f]

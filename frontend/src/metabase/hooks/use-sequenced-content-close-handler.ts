@@ -1,17 +1,16 @@
 import { useCallback, useRef } from "react";
 import _ from "underscore";
 
+import { isElement } from "metabase-types/guards";
+
 type PopoverData = {
   contentEl: Element;
   backdropEl?: Element;
+  ignoreEl?: Element;
   close: (e: MouseEvent | KeyboardEvent) => void;
 };
 
 export const RENDERED_POPOVERS: PopoverData[] = [];
-
-function isElement(a: any): a is Element {
-  return a instanceof Element;
-}
 
 function isEventInsideElement(e: Event, el: Element) {
   return isElement(e.target) && el.contains(e.target);
@@ -36,7 +35,8 @@ export function shouldClosePopover(
       mostRecentPopover === popoverData &&
       !isEventInsideElement(e, mostRecentPopover.contentEl) &&
       (!popoverData.backdropEl ||
-        isEventInsideElement(e, popoverData.backdropEl))
+        isEventInsideElement(e, popoverData.backdropEl)) &&
+      (!popoverData.ignoreEl || !isEventInsideElement(e, popoverData.ignoreEl))
     );
   }
 
@@ -52,6 +52,7 @@ export function shouldClosePopover(
   return false;
 }
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default function useSequencedContentCloseHandler() {
   const popoverDataRef = useRef<PopoverData>();
 

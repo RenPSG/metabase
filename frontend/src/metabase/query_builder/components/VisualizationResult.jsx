@@ -1,23 +1,29 @@
 /* eslint-disable react/prop-types */
-import React, { Component } from "react";
-import { t, jt } from "ttag";
 import cx from "classnames";
+import { Component } from "react";
+import { jt, t } from "ttag";
 import _ from "underscore";
 
-import ErrorMessage from "metabase/components/ErrorMessage";
-import Visualization from "metabase/visualizations/components/Visualization";
-import { datasetContainsNoResults } from "metabase/lib/dataset";
-import { CreateAlertModalContent } from "metabase/query_builder/components/AlertModals";
+import { ErrorMessage } from "metabase/components/ErrorMessage";
 import Modal from "metabase/components/Modal";
-import { ALERT_TYPE_ROWS } from "metabase-lib/lib/Alert";
+import ButtonsS from "metabase/css/components/buttons.module.css";
+import CS from "metabase/css/core/index.css";
+import { CreateAlertModalContent } from "metabase/notifications/AlertModals";
+import Visualization from "metabase/visualizations/components/Visualization";
+import * as Lib from "metabase-lib";
+import { ALERT_TYPE_ROWS } from "metabase-lib/v1/Alert";
+import { datasetContainsNoResults } from "metabase-lib/v1/queries/utils/dataset";
 
 const ALLOWED_VISUALIZATION_PROPS = [
+  // Table
+  "isShowingDetailsOnlyColumns",
   // Table Interactive
   "hasMetadataPopovers",
   "tableHeaderHeight",
   "scrollToColumn",
   "renderTableHeaderWrapper",
   "mode",
+  "renderEmptyMessage",
 ];
 
 export default class VisualizationResult extends Component {
@@ -52,17 +58,20 @@ export default class VisualizationResult extends Component {
       rawSeries,
       timelineEvents,
       selectedTimelineEventIds,
+      onNavigateBack,
       className,
+      isRunning,
+      renderEmptyMessage,
     } = this.props;
     const { showCreateAlertModal } = this.state;
 
     const noResults = datasetContainsNoResults(result.data);
-    if (noResults) {
+    if (noResults && !isRunning && !renderEmptyMessage) {
       const supportsRowsPresentAlert = question.alertType() === ALERT_TYPE_ROWS;
 
       // successful query but there were 0 rows returned with the result
       return (
-        <div className={cx(className, "flex")}>
+        <div className={cx(className, CS.flex)}>
           <ErrorMessage
             type="noRows"
             title={t`No results!`}
@@ -72,15 +81,21 @@ export default class VisualizationResult extends Component {
                 {supportsRowsPresentAlert && !isDirty && (
                   <p>
                     {jt`You can also ${(
-                      <a className="link" onClick={this.showCreateAlertModal}>
+                      <a
+                        className={CS.link}
+                        key="link"
+                        onClick={this.showCreateAlertModal}
+                      >
                         {t`get an alert`}
                       </a>
                     )} when there are some results.`}
                   </p>
                 )}
                 <button
-                  className="Button"
-                  onClick={() => window.history.back()}
+                  className={ButtonsS.Button}
+                  onClick={() =>
+                    onNavigateBack ? onNavigateBack() : window.history.back()
+                  }
                 >
                   {t`Back to previous results`}
                 </button>
@@ -88,7 +103,7 @@ export default class VisualizationResult extends Component {
             }
           />
           {showCreateAlertModal && (
-            <Modal full onClose={this.onCloseCreateAlertModal}>
+            <Modal medium onClose={this.onCloseCreateAlertModal}>
               <CreateAlertModalContent
                 onCancel={this.onCloseCreateAlertModal}
                 onAlertCreated={this.onCloseCreateAlertModal}
@@ -102,7 +117,8 @@ export default class VisualizationResult extends Component {
         this.props,
         ...ALLOWED_VISUALIZATION_PROPS,
       );
-      const hasDrills = this.props.query.isEditable();
+      const { isEditable } = Lib.queryDisplayInfo(question.query());
+      const hasDrills = isEditable;
       return (
         <>
           <Visualization
@@ -116,6 +132,7 @@ export default class VisualizationResult extends Component {
             isQueryBuilder={true}
             queryBuilderMode={queryBuilderMode}
             showTitle={false}
+            canToggleSeriesVisibility
             metadata={question.metadata()}
             timelineEvents={timelineEvents}
             selectedTimelineEventIds={selectedTimelineEventIds}
@@ -124,11 +141,11 @@ export default class VisualizationResult extends Component {
             onSelectTimelineEvents={this.props.selectTimelineEvents}
             onDeselectTimelineEvents={this.props.deselectTimelineEvents}
             onOpenChartSettings={this.props.onOpenChartSettings}
+            onUpdateQuestion={this.props.onUpdateQuestion}
             onUpdateWarnings={this.props.onUpdateWarnings}
             onUpdateVisualizationSettings={
               this.props.onUpdateVisualizationSettings
             }
-            query={this.props.query}
             {...vizSpecificProps}
           />
           {this.props.isObjectDetail && (

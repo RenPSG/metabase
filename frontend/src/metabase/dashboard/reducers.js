@@ -1,147 +1,52 @@
-import { assoc, dissoc, assocIn, updateIn, chain, merge } from "icepick";
-import { handleActions, combineReducers } from "metabase/lib/redux";
+import { assoc, assocIn, chain, dissoc, merge, updateIn } from "icepick";
+import reduceReducers from "reduce-reducers";
+import _ from "underscore";
+
+import Actions from "metabase/entities/actions";
+import Questions from "metabase/entities/questions";
+import { combineReducers, handleActions } from "metabase/lib/redux";
 
 import {
-  INITIALIZE,
-  FETCH_DASHBOARD,
-  SET_EDITING_DASHBOARD,
-  SET_DASHBOARD_ATTRIBUTES,
   ADD_CARD_TO_DASH,
-  CREATE_PUBLIC_LINK,
-  DELETE_PUBLIC_LINK,
-  UPDATE_EMBEDDING_PARAMS,
-  UPDATE_ENABLE_EMBEDDING,
+  ADD_MANY_CARDS_TO_DASH,
+  INITIALIZE,
+  MARK_NEW_CARD_SEEN,
+  REMOVE_CARD_FROM_DASH,
+  REMOVE_PARAMETER,
+  REPLACE_ALL_DASHCARD_VISUALIZATION_SETTINGS,
+  RESET_PARAMETERS,
   SET_DASHCARD_ATTRIBUTES,
   SET_MULTIPLE_DASHCARD_ATTRIBUTES,
+  SET_PARAMETER_VALUE,
+  SET_PARAMETER_VALUES,
+  UNDO_REMOVE_CARD_FROM_DASH,
   UPDATE_DASHCARD_VISUALIZATION_SETTINGS,
   UPDATE_DASHCARD_VISUALIZATION_SETTINGS_FOR_COLUMN,
-  REPLACE_ALL_DASHCARD_VISUALIZATION_SETTINGS,
-  REMOVE_CARD_FROM_DASH,
-  MARK_NEW_CARD_SEEN,
-  REMOVE_PARAMETER,
-  FETCH_CARD_DATA,
-  CLEAR_CARD_DATA,
-  UPDATE_DASHCARD_ID,
-  MARK_CARD_AS_SLOW,
-  SET_PARAMETER_VALUE,
-  FETCH_DASHBOARD_CARD_DATA,
-  CANCEL_FETCH_CARD_DATA,
-  SHOW_ADD_PARAMETER_POPOVER,
-  HIDE_ADD_PARAMETER_POPOVER,
-  SET_SIDEBAR,
-  CLOSE_SIDEBAR,
-  FETCH_DASHBOARD_PARAMETER_FIELD_VALUES_WITH_CACHE,
-  SAVE_DASHBOARD_AND_CARDS,
-  SET_DOCUMENT_TITLE,
-  SET_SHOW_LOADING_COMPLETE_FAVICON,
-  RESET,
+  fetchDashboard,
+  tabsReducer,
 } from "./actions";
-
-import { isVirtualDashCard, syncParametersAndEmbeddingParams } from "./utils";
-
-const dashboardId = handleActions(
-  {
-    [INITIALIZE]: { next: state => null },
-    [FETCH_DASHBOARD]: {
-      next: (state, { payload: { dashboardId } }) => dashboardId,
-    },
-    [RESET]: { next: state => null },
-  },
-  null,
-);
-
-const isEditing = handleActions(
-  {
-    [INITIALIZE]: { next: state => null },
-    [SET_EDITING_DASHBOARD]: {
-      next: (state, { payload }) => (payload ? payload : null),
-    },
-    [RESET]: { next: state => null },
-  },
-  null,
-);
-
-const loadingControls = handleActions(
-  {
-    [SET_DOCUMENT_TITLE]: (state, { payload }) => ({
-      ...state,
-      documentTitle: payload,
-    }),
-    [SET_SHOW_LOADING_COMPLETE_FAVICON]: (state, { payload }) => ({
-      ...state,
-      showLoadCompleteFavicon: payload,
-    }),
-    [RESET]: { next: state => ({}) },
-  },
-  {},
-);
-
-function newDashboard(before, after, isDirty) {
-  return {
-    ...before,
-    ...after,
-    embedding_params: syncParametersAndEmbeddingParams(before, after),
-    isDirty: isDirty ?? true,
-  };
-}
-
-const dashboards = handleActions(
-  {
-    [FETCH_DASHBOARD]: {
-      next: (state, { payload }) => ({
-        ...state,
-        ...payload.entities.dashboard,
-      }),
-    },
-    [SET_DASHBOARD_ATTRIBUTES]: {
-      next: (state, { payload: { id, attributes, isDirty } }) => {
-        return {
-          ...state,
-          [id]: newDashboard(state[id], attributes, isDirty),
-        };
-      },
-    },
-    [ADD_CARD_TO_DASH]: (state, { payload: dashcard }) => ({
-      ...state,
-      [dashcard.dashboard_id]: {
-        ...state[dashcard.dashboard_id],
-        ordered_cards: [
-          ...state[dashcard.dashboard_id].ordered_cards,
-          dashcard.id,
-        ],
-      },
-    }),
-    [CREATE_PUBLIC_LINK]: {
-      next: (state, { payload }) =>
-        assocIn(state, [payload.id, "public_uuid"], payload.uuid),
-    },
-    [DELETE_PUBLIC_LINK]: {
-      next: (state, { payload }) =>
-        assocIn(state, [payload.id, "public_uuid"], null),
-    },
-    [UPDATE_EMBEDDING_PARAMS]: {
-      next: (state, { payload }) =>
-        assocIn(
-          state,
-          [payload.id, "embedding_params"],
-          payload.embedding_params,
-        ),
-    },
-    [UPDATE_ENABLE_EMBEDDING]: {
-      next: (state, { payload }) =>
-        assocIn(
-          state,
-          [payload.id, "enable_embedding"],
-          payload.enable_embedding,
-        ),
-    },
-  },
-  {},
-);
+import { INITIAL_DASHBOARD_STATE } from "./constants";
+import {
+  autoApplyFilters,
+  dashboardId,
+  dashboards,
+  dashcardData,
+  editingDashboard,
+  isAddParameterPopoverOpen,
+  isNavigatingBackToDashboard,
+  loadingControls,
+  loadingDashCards,
+  missingActionParameters,
+  parameterValues,
+  sidebar,
+  slowCards,
+  theme,
+} from "./reducers-typed";
+import { calculateDashCardRowAfterUndo } from "./utils";
 
 const dashcards = handleActions(
   {
-    [FETCH_DASHBOARD]: {
+    [fetchDashboard.fulfilled]: {
       next: (state, { payload }) => ({
         ...state,
         ...payload.entities.dashcard,
@@ -154,7 +59,7 @@ const dashcards = handleActions(
       }),
     },
     [SET_MULTIPLE_DASHCARD_ATTRIBUTES]: {
-      next: (state, { payload: dashcards }) => {
+      next: (state, { payload: { dashcards } }) => {
         const nextState = { ...state };
         dashcards.forEach(({ id, attributes }) => {
           nextState[id] = {
@@ -203,206 +108,118 @@ const dashcards = handleActions(
       ...state,
       [dashcard.id]: { ...dashcard, isAdded: true, justAdded: true },
     }),
+    [ADD_MANY_CARDS_TO_DASH]: (state, { payload: dashcards }) => {
+      const storeDashcards = dashcards.map((dc, index) => ({
+        ...dc,
+        isAdded: true,
+        justAdded: index === 0,
+      }));
+      const storeDashCardsMap = _.indexBy(storeDashcards, "id");
+      return {
+        ...state,
+        ...storeDashCardsMap,
+      };
+    },
     [REMOVE_CARD_FROM_DASH]: (state, { payload: { dashcardId } }) => ({
       ...state,
       [dashcardId]: { ...state[dashcardId], isRemoved: true },
+    }),
+    [UNDO_REMOVE_CARD_FROM_DASH]: (state, { payload: { dashcardId } }) => ({
+      ...state,
+      [dashcardId]: {
+        ...state[dashcardId],
+        isRemoved: false,
+        row: calculateDashCardRowAfterUndo(state[dashcardId].row),
+      },
     }),
     [MARK_NEW_CARD_SEEN]: (state, { payload: dashcardId }) => ({
       ...state,
       [dashcardId]: { ...state[dashcardId], justAdded: false },
     }),
+    [Questions.actionTypes.UPDATE]: (state, { payload: { object: card } }) =>
+      _.mapObject(state, dashcard =>
+        dashcard.card?.id === card?.id
+          ? assocIn(dashcard, ["card"], card)
+          : dashcard,
+      ),
+    [Actions.actionTypes.UPDATE]: (state, { payload: { object: action } }) =>
+      _.mapObject(state, dashcard =>
+        dashcard.action?.id === action?.id
+          ? {
+              ...dashcard,
+              action: {
+                ...action,
+
+                database_enabled_actions:
+                  dashcard?.action.database_enabled_actions || false,
+              },
+            }
+          : dashcard,
+      ),
   },
-  {},
+  INITIAL_DASHBOARD_STATE.dashcards,
 );
 
-const isAddParameterPopoverOpen = handleActions(
+const draftParameterValues = handleActions(
   {
-    [SHOW_ADD_PARAMETER_POPOVER]: () => true,
-    [HIDE_ADD_PARAMETER_POPOVER]: () => false,
-    [INITIALIZE]: () => false,
-    [RESET]: () => false,
-  },
-  false,
-);
-
-const dashcardData = handleActions(
-  {
-    // clear existing dashboard data when loading a dashboard
-    [INITIALIZE]: { next: state => ({}) },
-    [FETCH_CARD_DATA]: {
-      next: (state, { payload: { dashcard_id, card_id, result } }) =>
-        assocIn(state, [dashcard_id, card_id], result),
+    [INITIALIZE]: {
+      next: (state, { payload: { clearCache = true } = {} }) => {
+        return clearCache ? {} : state;
+      },
     },
-    [CLEAR_CARD_DATA]: {
-      next: (state, { payload: { cardId, dashcardId } }) =>
-        assocIn(state, [dashcardId, cardId]),
+    [fetchDashboard.fulfilled]: {
+      next: (
+        state,
+        { payload: { dashboard, parameterValues, preserveParameters } },
+      ) =>
+        preserveParameters && !dashboard.auto_apply_filters
+          ? state
+          : parameterValues,
     },
-    [UPDATE_DASHCARD_ID]: {
-      next: (state, { payload: { oldDashcardId, newDashcardId } }) =>
-        chain(state)
-          .assoc(newDashcardId, state[oldDashcardId])
-          .dissoc(oldDashcardId)
-          .value(),
-    },
-    [RESET]: { next: state => ({}) },
-  },
-  {},
-);
-
-const slowCards = handleActions(
-  {
-    [MARK_CARD_AS_SLOW]: {
-      next: (state, { payload: { id, result } }) => ({
-        ...state,
-        [id]: result,
-      }),
-    },
-  },
-  {},
-);
-
-const parameterValues = handleActions(
-  {
-    [INITIALIZE]: { next: () => ({}) }, // reset values
     [SET_PARAMETER_VALUE]: {
-      next: (state, { payload: { id, value } }) => assoc(state, id, value),
+      next: (state, { payload: { id, value } }) =>
+        assoc(state ?? {}, id, value),
+    },
+    [SET_PARAMETER_VALUES]: {
+      next: (state, { payload }) => payload,
+    },
+    [RESET_PARAMETERS]: {
+      next: (state, { payload: parameters }) => {
+        return parameters.reduce(
+          (result, parameter) => assoc(result, parameter.id, parameter.value),
+          state ?? {},
+        );
+      },
     },
     [REMOVE_PARAMETER]: {
       next: (state, { payload: { id } }) => dissoc(state, id),
     },
-    [FETCH_DASHBOARD]: {
-      next: (state, { payload: { parameterValues } }) => parameterValues,
-    },
-    [RESET]: { next: state => ({}) },
   },
   {},
 );
 
-const parameterValuesSearchCache = handleActions(
-  {
-    [INITIALIZE]: { next: () => ({}) },
-    [SAVE_DASHBOARD_AND_CARDS]: {
-      next: () => ({}),
-    },
-    [FETCH_DASHBOARD_PARAMETER_FIELD_VALUES_WITH_CACHE]: {
-      next: (state, { payload }) =>
-        payload ? assoc(state, payload.cacheKey, payload.results) : state,
-    },
-    [RESET]: { next: state => ({}) },
-  },
-  {},
+export const dashboardReducers = reduceReducers(
+  INITIAL_DASHBOARD_STATE,
+  combineReducers({
+    dashboardId,
+    missingActionParameters,
+    autoApplyFilters,
+    theme,
+    slowCards,
+    isNavigatingBackToDashboard,
+    isAddParameterPopoverOpen,
+    editingDashboard,
+    loadingControls,
+    sidebar,
+    parameterValues,
+    dashboards,
+    loadingDashCards,
+    dashcards,
+    dashcardData,
+    draftParameterValues,
+    // Combined reducer needs to init state for every slice
+    selectedTabId: (state = INITIAL_DASHBOARD_STATE.selectedTabId) => state,
+    tabDeletions: (state = INITIAL_DASHBOARD_STATE.tabDeletions) => state,
+  }),
+  tabsReducer,
 );
-
-const loadingDashCards = handleActions(
-  {
-    [INITIALIZE]: {
-      next: state => ({
-        ...state,
-        loadingStatus: "idle",
-      }),
-    },
-    [FETCH_DASHBOARD]: {
-      next: (state, { payload }) => {
-        const cardIds = Object.values(payload.entities.dashcard || {})
-          .filter(dc => !isVirtualDashCard(dc))
-          .map(dc => dc.id);
-        return {
-          ...state,
-          dashcardIds: cardIds,
-          loadingIds: cardIds,
-          loadingStatus: "idle",
-        };
-      },
-    },
-    [FETCH_DASHBOARD_CARD_DATA]: {
-      next: state => ({
-        ...state,
-        loadingStatus: state.dashcardIds.length > 0 ? "running" : "idle",
-        startTime:
-          state.dashcardIds.length > 0 &&
-          // check that performance is defined just in case
-          typeof performance === "object"
-            ? performance.now()
-            : null,
-      }),
-    },
-    [FETCH_CARD_DATA]: {
-      next: (state, { payload: { dashcard_id } }) => {
-        const loadingIds = state.loadingIds.filter(id => id !== dashcard_id);
-        return {
-          ...state,
-          loadingIds,
-          ...(loadingIds.length === 0
-            ? { startTime: null, loadingStatus: "complete" }
-            : {}),
-        };
-      },
-    },
-    [CANCEL_FETCH_CARD_DATA]: {
-      next: (state, { payload: { dashcard_id } }) => {
-        const loadingIds = state.loadingIds.filter(id => id !== dashcard_id);
-        return {
-          ...state,
-          loadingIds,
-          ...(loadingIds.length === 0 ? { startTime: null } : {}),
-        };
-      },
-    },
-    [RESET]: {
-      next: state => ({
-        ...state,
-        loadingStatus: "idle",
-      }),
-    },
-  },
-  {
-    dashcardIds: [],
-    loadingIds: [],
-    startTime: null,
-    loadingStatus: "idle",
-  },
-);
-
-const DEFAULT_SIDEBAR = { props: {} };
-const sidebar = handleActions(
-  {
-    [INITIALIZE]: {
-      next: () => DEFAULT_SIDEBAR,
-    },
-    [SET_SIDEBAR]: {
-      next: (state, { payload: { name, props } }) => ({
-        name,
-        props: props || {},
-      }),
-    },
-    [CLOSE_SIDEBAR]: {
-      next: () => DEFAULT_SIDEBAR,
-    },
-    [SET_EDITING_DASHBOARD]: {
-      next: (state, { payload: isEditing }) =>
-        isEditing ? state : DEFAULT_SIDEBAR,
-    },
-    [REMOVE_PARAMETER]: {
-      next: () => DEFAULT_SIDEBAR,
-    },
-    [RESET]: {
-      next: () => DEFAULT_SIDEBAR,
-    },
-  },
-  DEFAULT_SIDEBAR,
-);
-
-export default combineReducers({
-  dashboardId,
-  isEditing,
-  loadingControls,
-  dashboards,
-  dashcards,
-  dashcardData,
-  slowCards,
-  parameterValues,
-  loadingDashCards,
-  isAddParameterPopoverOpen,
-  sidebar,
-  parameterValuesSearchCache,
-});

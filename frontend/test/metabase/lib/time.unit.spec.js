@@ -1,15 +1,21 @@
+import moment from "moment-timezone"; // eslint-disable-line no-restricted-imports -- deprecated usage
+
 import {
+  getRelativeTimeAbbreviated,
+  hoursToSeconds,
+  isValidTimeInterval,
+  msToHours,
+  msToMinutes,
+  msToSeconds,
   parseTime,
   parseTimestamp,
-  getRelativeTimeAbbreviated,
-  msToSeconds,
-  msToMinutes,
-  msToHours,
-  hoursToSeconds,
 } from "metabase/lib/time";
-import moment from "moment";
 
 describe("time", () => {
+  afterEach(() => {
+    moment.updateLocale(moment.locale(), { week: { dow: 0 } });
+  });
+
   describe("parseTimestamp", () => {
     const NY15_TOKYO = moment(1420038000000); // 2014-12-31 15:00 UTC
     const NY15_UTC = moment(1420070400000); // 2015-01-01 00:00 UTC
@@ -57,6 +63,17 @@ describe("time", () => {
       expect(moment.isMoment(result)).toBe(true);
       expect(result.unix()).toEqual(NY15_UTC.unix());
     });
+
+    it("should parse week of year correctly", () => {
+      const daysOfWeek = [0, 1, 2, 3, 4, 5, 6];
+      daysOfWeek.forEach(dayOfWeek => {
+        moment.updateLocale(moment.locale(), { week: { dow: dayOfWeek } });
+        expect(parseTimestamp(1, "week-of-year").isoWeek()).toBe(1);
+        expect(parseTimestamp(2, "week-of-year").isoWeek()).toBe(2);
+        expect(parseTimestamp(52, "week-of-year").isoWeek()).toBe(52);
+        expect(parseTimestamp(53, "week-of-year").isoWeek()).toBe(53);
+      });
+    });
   });
 
   describe("parseTime", () => {
@@ -85,29 +102,17 @@ describe("time", () => {
   describe("getRelativeTimeAbbreviated", () => {
     it("should show 'just now' for timestamps from the immediate past", () => {
       expect(
-        getRelativeTimeAbbreviated(
-          moment()
-            .subtract(30, "s")
-            .toString(),
-        ),
+        getRelativeTimeAbbreviated(moment().subtract(30, "s").toString()),
       ).toEqual("just now");
     });
 
     it("should show a shortened string for times 1 minute+", () => {
       expect(
-        getRelativeTimeAbbreviated(
-          moment()
-            .subtract(61, "s")
-            .toString(),
-        ),
+        getRelativeTimeAbbreviated(moment().subtract(61, "s").toString()),
       ).toEqual("1 m");
 
       expect(
-        getRelativeTimeAbbreviated(
-          moment()
-            .subtract(5, "d")
-            .toString(),
-        ),
+        getRelativeTimeAbbreviated(moment().subtract(5, "d").toString()),
       ).toEqual("5 d");
     });
   });
@@ -161,6 +166,20 @@ describe("time", () => {
       it(`returns ${expected} for ${value}`, () => {
         expect(hoursToSeconds(value)).toBe(expected);
       });
+    });
+  });
+
+  describe("isValidTimeInterval", () => {
+    it(`is not valid for 0 time span`, () => {
+      expect(isValidTimeInterval(0, "days")).toBeFalsy();
+    });
+
+    it(`is valid for small time spans`, () => {
+      expect(isValidTimeInterval(10, "days")).toBeTruthy();
+    });
+
+    it(`is not valid for large time spans`, () => {
+      expect(isValidTimeInterval(1000000000, "years")).toBeFalsy();
     });
   });
 });

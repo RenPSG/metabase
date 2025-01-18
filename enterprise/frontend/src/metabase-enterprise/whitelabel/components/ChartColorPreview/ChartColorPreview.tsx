@@ -1,14 +1,17 @@
-import React, { useMemo } from "react";
+import { useMemo } from "react";
 import { t } from "ttag";
+
 import { useDebouncedValue } from "metabase/hooks/use-debounced-value";
+
 import ChartColorSample from "../ChartColorSample";
-import { getAccentColors } from "./utils";
+
 import {
   TableBody,
   TableHeader,
   TableRoot,
   TableTitle,
 } from "./ChartColorPreview.styled";
+import { getAccentColorGroups } from "./utils";
 
 const PREVIEW_TIMEOUT = 400;
 
@@ -21,8 +24,8 @@ const ChartColorPreview = ({
 }: ChartColorPreviewProps): JSX.Element => {
   const changedColors = useDebouncedValue(colorPalette, PREVIEW_TIMEOUT);
 
-  const accentColors = useMemo(() => {
-    return getAccentColors(changedColors);
+  const colorGroups = useMemo(() => {
+    return getAccentColorGroups(changedColors);
   }, [changedColors]);
 
   return (
@@ -31,10 +34,11 @@ const ChartColorPreview = ({
         <TableTitle>{t`Palette preview`}</TableTitle>
       </TableHeader>
       <TableBody>
-        <ChartColorSample colors={accentColors} />
+        <ChartColorSample colorGroups={colorGroups} />
       </TableBody>
     </TableRoot>
   );
 };
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default ChartColorPreview;

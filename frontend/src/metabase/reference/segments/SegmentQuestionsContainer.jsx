@@ -1,24 +1,25 @@
 /* eslint "react/prop-types": "warn" */
-import React, { Component } from "react";
+import cx from "classnames";
 import PropTypes from "prop-types";
-import { connect } from "react-redux";
+import { Component } from "react";
 
-import SegmentSidebar from "./SegmentSidebar";
 import SidebarLayout from "metabase/components/SidebarLayout";
-import SegmentQuestions from "metabase/reference/segments/SegmentQuestions";
-
+import CS from "metabase/css/core/index.css";
+import Questions from "metabase/entities/questions";
+import { connect } from "metabase/lib/redux";
 import * as metadataActions from "metabase/redux/metadata";
 import * as actions from "metabase/reference/reference";
+import SegmentQuestions from "metabase/reference/segments/SegmentQuestions";
 
 import {
-  getUser,
-  getSegment,
-  getSegmentId,
   getDatabaseId,
   getIsEditing,
+  getSegment,
+  getSegmentId,
+  getUser,
 } from "../selectors";
 
-import Questions from "metabase/entities/questions";
+import SegmentSidebar from "./SegmentSidebar";
 
 const mapStateToProps = (state, props) => ({
   user: getUser(state, props),
@@ -69,7 +70,7 @@ class SegmentQuestionsContainer extends Component {
 
     return (
       <SidebarLayout
-        className="flex-full relative"
+        className={cx(CS.flexFull, CS.relative)}
         style={isEditing ? { paddingTop: "43px" } : {}}
         sidebar={<SegmentSidebar segment={segment} user={user} />}
       >

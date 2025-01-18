@@ -1,18 +1,15 @@
-import React from "react";
-import { t } from "ttag";
-import { Location } from "history";
-import { connect } from "react-redux";
+import type { Location } from "history";
+import type * as React from "react";
 import { push } from "react-router-redux";
+import { t } from "ttag";
 
 import Radio from "metabase/core/components/Radio";
-
-import { State } from "metabase-types/store";
-
-import { getSetting } from "metabase/selectors/settings";
-
+import { connect } from "metabase/lib/redux";
 import { PLUGIN_ADMIN_TOOLS } from "metabase/plugins";
+import { getSetting } from "metabase/selectors/settings";
+import type { State } from "metabase-types/store";
 
-import { TabsContainer, ContentContainer } from "./Tools.styled";
+import { ContentContainer, TabsContainer } from "./Tools.styled";
 
 type ToolsOwnProps = {
   location: Location;
@@ -85,6 +82,7 @@ function Tools({
   );
 }
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default connect<
   ToolsStateProps,
   ToolsDispatchProps,

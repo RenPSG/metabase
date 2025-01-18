@@ -1,21 +1,23 @@
 /* eslint "react/prop-types": "warn" */
-import React, { Component } from "react";
+import cx from "classnames";
 import PropTypes from "prop-types";
-import { connect } from "react-redux";
+import { Component } from "react";
 
-import TableSidebar from "./TableSidebar";
 import SidebarLayout from "metabase/components/SidebarLayout";
-import TableDetail from "metabase/reference/databases/TableDetail";
-
+import CS from "metabase/css/core/index.css";
+import { connect } from "metabase/lib/redux";
 import * as metadataActions from "metabase/redux/metadata";
+import TableDetail from "metabase/reference/databases/TableDetail";
 import * as actions from "metabase/reference/reference";
 
 import {
   getDatabase,
-  getTable,
   getDatabaseId,
   getIsEditing,
+  getTable,
 } from "../selectors";
+
+import TableSidebar from "./TableSidebar";
 
 const mapStateToProps = (state, props) => ({
   database: getDatabase(state, props),
@@ -63,7 +65,7 @@ class TableDetailContainer extends Component {
 
     return (
       <SidebarLayout
-        className="flex-full relative"
+        className={cx(CS.flexFull, CS.relative)}
         style={isEditing ? { paddingTop: "43px" } : {}}
         sidebar={<TableSidebar database={database} table={table} />}
       >

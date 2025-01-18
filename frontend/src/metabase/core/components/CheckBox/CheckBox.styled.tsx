@@ -1,7 +1,10 @@
 import styled from "@emotion/styled";
-import Icon from "metabase/components/Icon";
+
 import { color } from "metabase/lib/colors";
-import {
+import { Icon } from "metabase/ui";
+
+import { DEFAULT_ICON_PADDING } from "./constants";
+import type {
   CheckBoxContainerProps,
   CheckBoxIconContainerProps,
   CheckBoxIconProps,
@@ -37,7 +40,7 @@ export const CheckBoxContainer = styled.span<CheckBoxContainerProps>`
   opacity: ${props => (props.disabled ? "0.4" : "")};
 
   ${CheckBoxInput}:focus + & {
-    outline: 2px solid ${color("focus")};
+    outline: 2px solid var(--mb-color-focus);
   }
 
   ${CheckBoxInput}:focus:not(:focus-visible) + & {
@@ -47,6 +50,7 @@ export const CheckBoxContainer = styled.span<CheckBoxContainerProps>`
 
 export const CheckBoxIcon = styled(Icon)<CheckBoxIconProps>`
   display: block;
+  padding: ${DEFAULT_ICON_PADDING / 2}px;
   color: ${props => color(props.checked ? "white" : props.uncheckedColor)};
   width: ${props => `${props.size}px`};
   height: ${props => `${props.size}px`};
@@ -63,7 +67,7 @@ export const CheckBoxIconContainer = styled.span<CheckBoxIconContainerProps>`
     ${props => color(props.checked ? props.checkedColor : props.uncheckedColor)};
   border-radius: 0.25rem;
   background-color: ${props =>
-    color(props.checked ? props.checkedColor : "bg-white")};
+    props.checked ? color(props.checkedColor) : "var(--mb-color-bg-white)"};
 `;
 
 export const CheckBoxLabel = styled.span<CheckBoxLabelProps>`

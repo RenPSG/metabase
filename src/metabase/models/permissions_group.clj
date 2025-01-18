@@ -7,26 +7,40 @@
   them; they are created automatically. You can, however, set permissions for them.
 
   See documentation in [[metabase.models.permissions]] for more information about the Metabase permissions system."
-  (:require [clojure.string :as str]
-            [honeysql.helpers :as hh]
-            [metabase.db.connection :as mdb.connection]
-            [metabase.models.setting :as setting]
-            [metabase.plugins.classloader :as classloader]
-            [metabase.public-settings.premium-features :as premium-features]
-            [metabase.util :as u]
-            [metabase.util.i18n :refer [tru]]
-            [toucan.db :as db]
-            [toucan.models :as models]))
+  (:require
+   [metabase.db :as mdb]
+   [metabase.models.data-permissions :as data-perms]
+   [metabase.models.interface :as mi]
+   [metabase.models.serialization :as serdes]
+   [metabase.models.setting :as setting]
+   [metabase.plugins.classloader :as classloader]
+   [metabase.premium-features.core :as premium-features]
+   [metabase.util :as u]
+   [metabase.util.i18n :refer [tru]]
+   [methodical.core :as methodical]
+   [toucan2.core :as t2]
+   [toucan2.tools.hydrate :as t2.hydrate]))
 
-(models/defmodel PermissionsGroup :permissions_group)
+(methodical/defmethod t2/table-name :model/PermissionsGroup [_model] :permissions_group)
+(methodical/defmethod t2/model-for-automagic-hydration [:default :permissions_group] [_original-model _k] :model/PermissionsGroup)
+(methodical/defmethod t2.hydrate/fk-keys-for-automagic-hydration [:default :permissions_group :default]
+  [_original-model _dest-key _hydrating-model]
+  [:permissions_group_id])
 
+(doto :model/PermissionsGroup
+  (derive :metabase/model)
+  (derive :hook/entity-id))
+
+(defmethod serdes/hash-fields :model/PermissionsGroup
+  [_user]
+  [:name])
 
 ;;; -------------------------------------------- Magic Groups Getter Fns ---------------------------------------------
 
 (defn- magic-group [group-name]
-  (mdb.connection/memoize-for-application-db
+  (mdb/memoize-for-application-db
    (fn []
-     (u/prog1 (db/select-one PermissionsGroup :name group-name)
+     (u/prog1 (t2/select-one [:model/PermissionsGroup :id :name] :name group-name)
        ;; normally it is impossible to delete the magic [[all-users]] or [[admin]] Groups -- see
        ;; [[check-not-magic-group]]. This assertion is here to catch us if we do something dumb when hacking on
        ;; the MB code -- to make tests fail fast. For that reason it's not i18n'ed.
@@ -50,15 +64,14 @@
   "Fetch the `Administrators` permissions group"
   (magic-group admin-group-name))
 
-
 ;;; --------------------------------------------------- Validation ---------------------------------------------------
 
 (defn exists-with-name?
   "Does a `PermissionsGroup` with `group-name` exist in the DB? (case-insensitive)"
   ^Boolean [group-name]
   {:pre [((some-fn keyword? string?) group-name)]}
-  (db/exists? PermissionsGroup
-    :%lower.name (str/lower-case (name group-name))))
+  (t2/exists? :model/PermissionsGroup
+              :%lower.name (u/lower-case-en (name group-name))))
 
 (defn- check-name-not-already-taken
   [group-name]
@@ -73,16 +86,28 @@
                        (admin)]]
     (when (= id (:id magic-group))
       (throw (ex-info (tru "You cannot edit or delete the ''{0}'' permissions group!" (:name magic-group))
-               {:status-code 400})))))
-
+                      {:status-code 400})))))
 
 ;;; --------------------------------------------------- Lifecycle ----------------------------------------------------
 
-(defn- pre-insert [{group-name :name, :as group}]
+(t2/define-before-insert :model/PermissionsGroup
+  [{group-name :name, :as group}]
   (u/prog1 group
     (check-name-not-already-taken group-name)))
 
-(defn- pre-delete [{id :id, :as group}]
+(defn- set-default-permission-values!
+  [group]
+  (t2/with-transaction [_conn]
+    (doseq [db-id (t2/select-pks-vec :model/Database)]
+      (data-perms/set-new-group-permissions! group db-id (u/the-id (all-users))))))
+
+(t2/define-after-insert :model/PermissionsGroup
+  [group]
+  (u/prog1 group
+    (set-default-permission-values! group)))
+
+(t2/define-before-delete :model/PermissionsGroup
+  [{id :id, :as group}]
   (check-not-magic-group group)
   ;; Remove from LDAP mappings
   (classloader/require 'metabase.integrations.ldap)
@@ -93,40 +118,50 @@
              (for [val (vals mappings)]
                (remove (partial = id) val))))))
 
-(defn- pre-update [{group-name :name, :as group}]
-  (u/prog1 group
-    (check-not-magic-group group)
-    (when group-name
-      (check-name-not-already-taken group-name))))
-
-(u/strict-extend (class PermissionsGroup)
-  models/IModel (merge models/IModelDefaults
-                   {:pre-delete  pre-delete
-                    :pre-insert  pre-insert
-                    :pre-update  pre-update}))
+(t2/define-before-update :model/PermissionsGroup
+  [group]
+  (let [changes (t2/changes group)]
+    (u/prog1 group
+      (when (contains? changes :name)
+        ;; Allow backfilling the entity ID for magic groups, but not changing anything else
+        (check-not-magic-group group))
+      (when-let [group-name (:name changes)]
+        (check-name-not-already-taken group-name)))))
 
 ;;; ---------------------------------------------------- Util Fns ----------------------------------------------------
 
-
-(defn ^:hydrate members
-  "Return `Users` that belong to GROUP-OR-ID, ordered by their name (case-insensitive)."
-  [group-or-id]
-  (db/query (cond-> {:select    [:user.first_name
-                                 :user.last_name
-                                 :user.email
-                                 [:user.id :user_id]
-                                 [:pgm.id :membership_id]]
-                     :from      [[:core_user :user]]
-                     :left-join [[:permissions_group_membership :pgm] [:= :user.id :pgm.user_id]]
-                     :where     [:and [:= :user.is_active true]
-                                 [:= :pgm.group_id (u/the-id group-or-id)]]
-                     :order-by  [[:%lower.user.first_name :asc]
-                                 [:%lower.user.last_name :asc]]}
-
-              (premium-features/enable-advanced-permissions?)
-              (hh/merge-select [:pgm.is_group_manager :is_group_manager]))))
+(methodical/defmethod t2/batched-hydrate [:model/PermissionsGroup :members]
+  "Batch hydration Users for a list of PermissionsGroups"
+  [_model k groups]
+  (mi/instances-with-hydrated-data
+   groups k
+   #(group-by :group_id (t2/select :model/User {:select    [:u.id
+                                                            ;; user_id is for legacy reasons, we should remove it
+                                                            [:u.id :user_id]
+                                                            :u.first_name
+                                                            :u.last_name
+                                                            :u.email
+                                                            :pgm.group_id
+                                                            [:pgm.id :membership_id]
+                                                            (when (premium-features/enable-advanced-permissions?)
+                                                              [:pgm.is_group_manager :is_group_manager])]
+                                                :from      [[:core_user :u]]
+                                                :left-join [[:permissions_group_membership :pgm] [:= :u.id :pgm.user_id]]
+                                                :where     [:and
+                                                            [:= :u.is_active true]
+                                                            [:in :pgm.group_id (map :id groups)]]
+                                                :order-by  [[[:lower :u.first_name] :asc]
+                                                            [[:lower :u.last_name] :asc]]}))
+   :id
+   {:default []}))
 
 (defn non-admin-groups
   "Return a set of the IDs of all `PermissionsGroups`, aside from the admin group."
   []
-  (db/select PermissionsGroup :name [:not= admin-group-name]))
+  (t2/select :model/PermissionsGroup :name [:not= admin-group-name]))
+
+(defn non-magic-groups
+  "Return a set of the IDs of all `PermissionsGroups`, aside from the admin group and the All Users group."
+  []
+  (t2/select :model/PermissionsGroup {:where [:and [:not= :name admin-group-name]
+                                              [:not= :name all-users-group-name]]}))

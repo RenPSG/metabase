@@ -1,15 +1,19 @@
 (ns metabase.util.i18n
   "i18n functionality."
-  (:require [cheshire.generate :as json.generate]
-            [clojure.string :as str]
-            [clojure.tools.logging :as log]
-            [clojure.walk :as walk]
-            [metabase.util.i18n.impl :as i18n.impl]
-            [potemkin :as p]
-            [potemkin.types :as p.types]
-            [schema.core :as s])
-  (:import java.text.MessageFormat
-           java.util.Locale))
+  (:require
+   [clojure.string :as str]
+   [clojure.walk :as walk]
+   [metabase.util.i18n.impl :as i18n.impl]
+   [metabase.util.json :as json]
+   [metabase.util.log :as log]
+   [net.cgrand.macrovich :as macros]
+   [potemkin :as p]
+   [potemkin.types :as p.types])
+  (:import
+   (java.text MessageFormat)
+   (java.util Locale)))
+
+(set! *warn-on-reflection* true)
 
 (p/import-vars
  [i18n.impl
@@ -63,59 +67,67 @@
     ;; because the locale is normalized before saving (metabase#15657, metabase#16654)
     [(normalized-locale-string locale-name) (.getDisplayName (locale locale-name))]))
 
-(defn translate-site-locale
+(defn- translate-site-locale
   "Translate a string with the System locale."
-  [format-string & args]
-  (let [translated (apply translate (site-locale) format-string args)]
+  [format-string args pluralization-opts]
+  (let [translated (translate (site-locale) format-string args pluralization-opts)]
     (log/tracef "Translated %s for site locale %s -> %s"
                 (pr-str format-string) (pr-str (site-locale-string)) (pr-str translated))
     translated))
 
-(defn translate-user-locale
+(defn- translate-user-locale
   "Translate a string with the current User's locale."
-  [format-string & args]
-  (let [translated (apply translate (user-locale) format-string args)]
+  [format-string args pluralization-opts]
+  (let [translated (translate (user-locale) format-string args pluralization-opts)]
     (log/tracef "Translating %s for user locale %s (site locale %s) -> %s"
                 (pr-str format-string) (pr-str (user-locale-string))
                 (pr-str (site-locale-string)) (pr-str translated))
     translated))
 
-(p.types/defrecord+ UserLocalizedString [format-string args]
+(p.types/defrecord+ UserLocalizedString [format-string args pluralization-opts]
   Object
   (toString [_]
-    (apply translate-user-locale format-string args))
-  schema.core.Schema
-  (explain [this]
-    (str this)))
+    (translate-user-locale format-string args pluralization-opts)))
 
-(p.types/defrecord+ SiteLocalizedString [format-string args]
+(p.types/defrecord+ SiteLocalizedString [format-string args pluralization-opts]
   Object
   (toString [_]
-    (apply translate-site-locale format-string args))
-  s/Schema
-  (explain [this]
-    (str this)))
+    (translate-site-locale format-string args pluralization-opts)))
 
 (defn- localized-to-json
   "Write a UserLocalizedString or SiteLocalizedString to the `json-generator`. This is intended for
-  `json.generate/add-encoder`. Ideally we'd implement those protocols directly as it's faster, but currently that doesn't
+  `json/add-encoder`. Ideally we'd implement those protocols directly as it's faster, but currently that doesn't
   work with Cheshire"
   [localized-string json-generator]
-  (json.generate/write-string json-generator (str localized-string)))
+  (json/write-string json-generator (str localized-string)))
 
-(json.generate/add-encoder UserLocalizedString localized-to-json)
-(json.generate/add-encoder SiteLocalizedString localized-to-json)
+(json/add-encoder UserLocalizedString localized-to-json)
+(json/add-encoder SiteLocalizedString localized-to-json)
 
 (def LocalizedString
   "Schema for user and system localized string instances"
-  (s/cond-pre UserLocalizedString SiteLocalizedString))
+  (letfn [(instance-of [^Class klass]
+            [:fn
+             {:error/message (str "instance of " (.getCanonicalName klass))}
+             (partial instance? klass)])]
+    [:or
+     (instance-of UserLocalizedString)
+     (instance-of SiteLocalizedString)]))
+
+(defn- valid-str-form?
+  [str-form]
+  (and
+   (= (first str-form) 'str)
+   (every? string? (rest str-form))))
 
 (defn- validate-number-of-args
   "Make sure the right number of args were passed to `trs`/`tru` and related forms during macro expansion."
-  [format-string args]
-  (assert (string? format-string)
-          "The first arg to (deferred-)trs/tru must be a String! `gettext` does not eval Clojure files.")
-  (let [message-format             (MessageFormat. format-string)
+  [format-string-or-str args]
+  (let [format-string              (cond
+                                     (string? format-string-or-str) format-string-or-str
+                                     (valid-str-form? format-string-or-str) (apply str (rest format-string-or-str))
+                                     :else (assert false "The first arg to (deferred-)trs/tru must be a String or a valid `str` form with String arguments!"))
+        message-format             (MessageFormat. format-string)
         ;; number of {n} placeholders in format string including any you may have skipped. e.g. "{0} {2}" -> 3
         expected-num-args-by-index (count (.getFormatsByArgumentIndex message-format))
         ;; number of {n} placeholders in format string *not* including ones you make have skipped. e.g. "{0} {2}" -> 2
@@ -126,26 +138,36 @@
                     (pr-str (.toPattern message-format))
                     (str/join ", " (map (partial format "{%d}") (range expected-num-args-by-index)))))
     (assert (= expected-num-args actual-num-args)
-            (str (format (str "(deferred-)trs/tru with format string %s expects %d args, got %d.")
+            (str (format "(deferred-)trs/tru with format string %s expects %d args, got %d."
                          (pr-str (.toPattern message-format)) expected-num-args actual-num-args)
                  " Did you forget to escape a single quote?"))))
 
 (defmacro deferred-tru
   "Similar to `tru` but creates a `UserLocalizedString` instance so that conversion to the correct locale can be delayed
   until it is needed. The user locale comes from the browser, so conversion to the localized string needs to be 'late
-  bound' and only occur when the user's locale is in scope. Calling `str` on the results of this invocation will
-  lookup the translated version of the string."
-  [format-string & args]
-  (validate-number-of-args format-string args)
-  `(UserLocalizedString. ~format-string ~(vec args)))
+  bound' and only occur when the user's locale is in scope.
+
+  The first argument can be a format string, or a valid `str` form with all string arguments. The latter can be used to
+  split a long string over multiple lines.
+
+  Calling `str` on the results of this invocation will lookup the translated version of the string."
+  {:style/indent [:form]}
+  [format-string-or-str & args]
+  (validate-number-of-args format-string-or-str args)
+  `(UserLocalizedString. ~format-string-or-str ~(vec args) {}))
 
 (defmacro deferred-trs
   "Similar to `trs` but creates a `SiteLocalizedString` instance so that conversion to the correct locale can be
   delayed until it is needed. This is needed as the system locale from the JVM can be overridden/changed by a setting.
+
+  The first argument can be a format string, or a valid `str` form with all string arguments. The latter can be used to
+  split a long string over multiple lines.
+
   Calling `str` on the results of this invocation will lookup the translated version of the string."
+  {:style/indent [:form]}
   [format-string & args]
   (validate-number-of-args format-string args)
-  `(SiteLocalizedString. ~format-string ~(vec args)))
+  `(SiteLocalizedString. ~format-string ~(vec args) {}))
 
 (def ^String ^{:arglists '([& args])} str*
   "Ensures that `trs`/`tru` isn't called prematurely, during compilation."
@@ -154,22 +176,92 @@
       (throw (Exception. "Premature i18n string lookup. Is there a top-level call to `trs` or `tru`?")))
     str))
 
-(defmacro tru
+(defmacro tru-clj
   "Applies `str` to `deferred-tru`'s expansion.
+
+  The first argument can be a format string, or a valid `str` form with all string arguments. The latter can be used to
+  split a long string over multiple lines.
+
   Prefer this over `deferred-tru`. Use `deferred-tru` only in code executed at compile time, or where `str` is manually
   applied to the result."
-  [format-string & args]
-  `(str* (deferred-tru ~format-string ~@args)))
+  {:style/indent [:form]}
+  [format-string-or-str & args]
+  `(str* (deferred-tru ~format-string-or-str ~@args)))
 
-(defmacro trs
+(defmacro trs-clj
   "Applies `str` to `deferred-trs`'s expansion.
+
+  The first argument can be a format string, or a valid `str` form with all string arguments. The latter can be used to
+  split a long string over multiple lines.
+
   Prefer this over `deferred-trs`. Use `deferred-trs` only in code executed at compile time, or where `str` is manually
   applied to the result."
-  [format-string & args]
-  `(str* (deferred-trs ~format-string ~@args)))
+  {:style/indent [:form]}
+  [format-string-or-str & args]
+  `(str* (deferred-trs ~format-string-or-str ~@args)))
 
-;; TODO - I seriously doubt whether these are still actually needed now that `tru` and `trs` generate forms wrapped in
-;; `str` by default
+(defn- validate-n
+  "Make sure that `trsn`/`trun` and related forms have valid format strings, with most one placeholder (for n)"
+  [format-string format-string-pl]
+  (assert (and (string? format-string) (string? format-string-pl))
+          "The first and second args to (deferred-)trsn/trun must be Strings!")
+  (let [validate (fn [format-string]
+                   (let [message-format    (MessageFormat. format-string)
+                         ;; number of {n} placeholders in format string including any you may have skipped. e.g. "{0} {2}" -> 3
+                         num-args-by-index (count (.getFormatsByArgumentIndex message-format))
+                         ;; number of {n} placeholders in format string *not* including ones you make have skipped. e.g. "{0} {2}" -> 2
+                         num-args          (count (.getFormats message-format))]
+                     (assert (and (<= num-args-by-index 1) (<= num-args 1))
+                             (format "(deferred-)trsn/trun only supports a single {0} placeholder for the value `n`"))))]
+    (validate format-string)
+    (validate format-string-pl)))
+
+(defmacro deferred-trun
+  "Similar to `deferred-tru` but chooses the appropriate singular or plural form based on the value of `n`.
+
+  The first argument should be the singular form; the second argument should be the plural form, and the third argument
+  should be `n`. `n` can be interpolated into the translated string using the `{0}` placeholder syntax, but no
+  additional placeholders are supported.
+
+    (deferred-trun \"{0} table\" \"{0} tables\" n)"
+  [format-string format-string-pl n]
+  (validate-n format-string format-string-pl)
+  `(UserLocalizedString. ~format-string ~[n] ~{:n n :format-string-pl format-string-pl}))
+
+(defmacro trun-clj
+  "Similar to `tru` but chooses the appropriate singular or plural form based on the value of `n`.
+
+  The first argument should be the singular form; the second argument should be the plural form, and the third argument
+  should be `n`. `n` can be interpolated into the translated string using the `{0}` placeholder syntax, but no
+  additional placeholders are supported.
+
+    (trun \"{0} table\" \"{0} tables\" n)"
+  [format-string format-string-pl n]
+  `(str* (deferred-trun ~format-string ~format-string-pl ~n)))
+
+(defmacro deferred-trsn
+  "Similar to `deferred-trs` but chooses the appropriate singular or plural form based on the value of `n`.
+
+  The first argument should be the singular form; the second argument should be the plural form, and the third argument
+  should be `n`. `n` can be interpolated into the translated string using the `{0}` placeholder syntax, but no
+  additional placeholders are supported.
+
+    (deferred-trsn \"{0} table\" \"{0} tables\" n)"
+  [format-string format-string-pl n]
+  (validate-n format-string format-string-pl)
+  `(SiteLocalizedString. ~format-string ~[n] ~{:n n :format-string-pl format-string-pl}))
+
+(defmacro trsn-clj
+  "Similar to `trs` but chooses the appropriate singular or plural form based on the value of `n`.
+
+  The first argument should be the singular form; the second argument should be the plural form, and the third argument
+  should be `n`. `n` can be interpolated into the translated string using the `{0}` placeholder syntax, but no
+  additional placeholders are supported.
+
+    (trsn \"{0} table\" \"{0} tables\" n)"
+  [format-string format-string-pl n]
+  `(str* (deferred-trsn ~format-string ~format-string-pl ~n)))
+
 (defn localized-string?
   "Returns true if `x` is a system or user localized string instance"
   [x]
@@ -182,3 +274,62 @@
                    (cond-> node
                      (localized-string? node) str))
                  x))
+
+;;;; Clojure/ClojureScript macros
+
+(defmacro tru
+  "i18n a string with the user's locale. Format string will be translated to the user's locale when the form is eval'ed.
+  Placeholders should use `gettext` format e.g. `{0}`, `{1}`, and so forth.
+
+    (tru \"Number of cans: {0}\" 2)"
+  {:style/indent [:form]}
+  [format-string & args]
+  (macros/case
+    :clj
+    `(tru-clj ~format-string ~@args)
+
+    :cljs
+    `(js-i18n ~format-string ~@args)))
+
+(defmacro trs
+  "i18n a string with the site's locale, when called from Clojure. Format string will be translated to the site's
+  locale when the form is eval'ed. Placeholders should use `gettext` format e.g. `{0}`, `{1}`, and so forth.
+
+    (trs \"Number of cans: {0}\" 2)
+
+  NOTE: When called from ClojureScript, this function behaves identically to `tru`. The originating JS callsite must
+  temporarily override the locale used by ttag using the `withInstanceLocalization` wrapper function."
+  {:style/indent [:form]}
+  [format-string & args]
+  (macros/case
+    :clj
+    `(trs-clj ~format-string ~@args)
+
+    :cljs
+    `(js-i18n ~format-string ~@args)))
+
+(defmacro trun
+  "i18n a string with both singular and plural forms, using the current user's locale. The appropriate plural form will
+  be returned based on the value of `n`. `n` can be interpolated into the format strings using the `{0}`
+  syntax. (Other placeholders are not supported)."
+  {:style/indent [:form]}
+  [format-string format-string-pl n]
+  (macros/case
+    :clj
+    `(trun-clj ~format-string ~format-string-pl ~n)
+
+    :cljs
+    `(js-i18n-n ~format-string ~format-string-pl ~n)))
+
+(defmacro trsn
+  "i18n a string with both singular and plural forms, using the site's locale. The appropriate plural form will be
+  returned based on the value of `n`. `n` can be interpolated into the format strings using the `{0}` syntax. (Other
+  placeholders are not supported)."
+  {:style/indent [:form]}
+  [format-string format-string-pl n]
+  (macros/case
+    :clj
+    `(trsn-clj ~format-string ~format-string-pl ~n)
+
+    :cljs
+    `(js-i18n-n ~format-string ~format-string-pl ~n)))

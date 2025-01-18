@@ -1,165 +1,297 @@
-## Getting started
+---
+title: Metabase documentation
+redirect_from:
+  - /docs/latest/enterprise-guide
+  - /docs/latest/users-guide
+  - /docs/latest/administration-guide
+  - /docs/latest/operations-guide
+  - /docs/latest/faq
+---
 
-- [Getting started](/learn/getting-started/getting-started)
-- [A tour of Metabase](/learn/getting-started/tour-of-metabase)
+# Metabase documentation
 
-## Troubleshooting and getting help
+![Metabase dashboard](./images/metabase-product-screenshot.png)
+
+Metabase is an open-source business intelligence platform. You can use Metabase to ask questions about your data, or embed Metabase in your app to let your customers explore their data on their own.
+
+## First steps
+
+### Metabase Cloud
+
+The easiest way to get started with Metabase is to sign up for a free trial of [Metabase Cloud](https://store.metabase.com/checkout). You get support, backups, upgrades, an SMTP server, SSL certificate, SoC2 Type 2 security auditing, and more (plus your money goes toward improving Metabase). Check out our quick overview of [cloud vs self-hosting](https://www.metabase.com/docs/latest/cloud/cloud-vs-self-hosting). If you need to, you can always switch to [self-hosting](./installation-and-operation/installing-metabase.md) Metabase at any time (or vice versa).
+
+### [Installing Metabase](./installation-and-operation/installing-metabase.md)
+
+Run as a JAR, using Docker, or on [Metabase Cloud](https://store.metabase.com/checkout).
+
+### [Setting up Metabase](./configuring-metabase/setting-up-metabase.md)
+
+Once installed, set up your Metabase and connect to your data.
+
+### [Getting started](https://www.metabase.com/learn/metabase-basics/getting-started/index)
+
+With your data connected, get started asking questions, creating dashboards, and sharing your work.
+
+### [A tour of Metabase](https://www.metabase.com/learn/metabase-basics/overview/tour-of-metabase)
+
+Metabase is a deep product with a lot of tools to simplify business intelligence, from embeddable charts and interactive dashboards, to GUI and SQL editors, to auditing and data sandboxing, and more.
+
+## Documentation topics
+
+Metabase's reference documentation.
+
+### Installation
+
+- [Installation overview](./installation-and-operation/start.md)
+- [Installing Metabase](./installation-and-operation/installing-metabase.md)
+- [Upgrading Metabase](./installation-and-operation/upgrading-metabase.md)
+- [Configuring the Metabase application database](./installation-and-operation/configuring-application-database.md)
+- [Backing up Metabase](./installation-and-operation/backing-up-metabase-application-data.md)
+- [Migrating to a production application database](./installation-and-operation/migrating-from-h2.md)
+- [Monitoring your Metabase](./installation-and-operation/monitoring-metabase.md)
+- [Serialization](./installation-and-operation/serialization.md)
+- [Commands](./installation-and-operation/commands.md)
+- [Supported browsers](./installation-and-operation/supported-browsers.md)
+- [Privacy](./installation-and-operation/privacy.md)
+- [About the anonymous usage data we collect](./installation-and-operation/information-collection.md)
+
+### Databases
+
+- [Databases overview](./databases/start.md)
+- [Adding and managing databases](./databases/connecting.md)
+- [Database users, roles, and privileges](./databases/users-roles-privileges.md)
+- [Syncing and scanning databases](./databases/sync-scan.md)
+- [Encrypting your database connection](./databases/encrypting-details-at-rest.md)
+- [SSH tunneling](./databases/ssh-tunnel.md)
+- [SSL certificate](./databases/ssl-certificates.md)
+- [Uploading data](./databases/uploads.md)
+
+### Questions
+
+- [Questions overview](./questions/start.md)
+- [Alerts](./questions/alerts.md)
+- [Exporting data](./questions/exporting-results.md)
+
+#### Query builder
+
+- [The query editor](./questions/query-builder/editor.md)
+- [Filtering](./questions/query-builder/filters.md)
+- [Summarizing and grouping](./questions/query-builder/summarizing-and-grouping.md)
+- [Custom expressions](./questions/query-builder/expressions.md)
+- [List of expressions](./questions/query-builder/expressions-list.md)
+- [Joining data](./questions/query-builder/join.md)
+
+#### SQL and native queries
+
+- [The SQL editor](./questions/native-editor/writing-sql.md)
+- [SQL parameters](./questions/native-editor/sql-parameters.md)
+- [Referencing models and saved questions](./questions/native-editor/referencing-saved-questions-in-queries.md)
+- [SQL snippets](./questions/native-editor/sql-snippets.md)
+- [SQL snippet folder permissions](./permissions/snippets.md)
+
+#### Visualizing data
+
+- [Visualizing data](./questions/visualizations/visualizing-results.md)
+- [Combo charts](./questions/visualizations/combo-chart.md)
+- [Detail](./questions/visualizations/detail.md)
+- [Funnel charts](./questions/visualizations/detail.md)
+- [Gauge charts](./questions/visualizations/gauge.md)
+- [Line, bar, and area charts](./questions/visualizations/line-bar-and-area-charts.md)
+- [Maps](./questions/visualizations/map.md)
+- [Numbers](./questions/visualizations/numbers.md)
+- [Pie or donut charts](./questions/visualizations/pie-or-donut-chart.md)
+- [Pivot table](./questions/visualizations/pivot-table.md)
+- [Progress bar](./questions/visualizations/progress-bar.md)
+- [Sankey chart](./questions/visualizations/sankey.md)
+- [Scatterplot or bubble chart](./questions/visualizations/scatterplot-or-bubble-chart.md)
+- [Table](./questions/visualizations/table.md)
+- [Tooltips](./questions/visualizations/tooltips.md)
+- [Trend](./questions/visualizations/trend.md)
+- [Waterfall chart](./questions/visualizations/waterfall-chart.md)
+
+### Dashboards
+
+- [Dashboards overview](./dashboards/start.md)
+- [Introduction to dashboards](./dashboards/introduction.md)
+- [Dashboard filters](./dashboards/filters.md)
+- [Interactive dashboards](./dashboards/interactive.md)
+- [Charts with multiple series](./dashboards/multiple-series.md)
+- [Dashboard subscriptions](./dashboards/subscriptions.md)
+- [Actions on dashboards](./dashboards/actions.md)
+
+### Data modeling
+
+- [Data modeling overview](./data-modeling/start.md)
+- [Models](./data-modeling/models.md)
+- [Model persistence](./data-modeling/model-persistence.md)
+- [Metrics](./data-modeling/metrics.md)
+- [Table metadata admin settings](./data-modeling/metadata-editing.md)
+- [Field types](./data-modeling/field-types.md)
+- [Formatting defaults](./data-modeling/formatting.md)
+- [Working with JSON](./data-modeling/json-unfolding.md)
+- [Segments](./data-modeling/segments.md)
+
+### Actions
+
+- [Actions overview](./actions/start.md)
+- [Introduction to actions](./actions/introduction.md)
+- [Basic actions](./actions/basic.md)
+- [Custom actions](./actions/custom.md)
+
+### Organization
+
+- [Organization overview](./exploration-and-organization/start.md)
+- [Basic exploration](./exploration-and-organization/exploration.md)
+- [Collections](./exploration-and-organization/collections.md)
+- [History](./exploration-and-organization/history.md)
+- [Trash](./exploration-and-organization/delete-and-restore.md)
+- [Data reference](./exploration-and-organization/data-model-reference.md)
+- [Events and timelines](./exploration-and-organization/events-and-timelines.md)
+- [X-rays](./exploration-and-organization/x-rays.md)
+- [Content verification](./exploration-and-organization/content-verification.md)
+
+### People
+
+- [People overview](./people-and-groups/start.md)
+- [Account settings](./people-and-groups/account-settings.md)
+- [Managing people and groups](./people-and-groups/managing.md)
+- [Password complexity](./people-and-groups/changing-password-complexity.md)
+- [Session expiration](./people-and-groups/changing-session-expiration.md)
+- [Google Sign-In](./people-and-groups/google-sign-in.md)
+- [LDAP](./people-and-groups/ldap.md)
+- [API keys](./people-and-groups/api-keys.md)
+
+#### Paid SSO options
+
+- [JWT-based authentication](./people-and-groups/authenticating-with-jwt.md)
+- [SAML-based authentication](./people-and-groups/authenticating-with-saml.md)
+  - [SAML with Auth0](./people-and-groups/saml-auth0.md)
+  - [SAML with Microsoft Entra ID](./people-and-groups/saml-azure.md)
+  - [SAML with Google](./people-and-groups/saml-google.md)
+  - [SAML with Keycloak](./people-and-groups/saml-keycloak.md)
+  - [SAML with Okta](./people-and-groups/saml-okta.md)
+- [User provisioning with SCIM](./people-and-groups/user-provisioning.md)
+
+### Permissions
+
+- [Permissions overview](./permissions/start.md)
+- [Permissions introduction](./permissions/introduction.md)
+- [Data permissions](./permissions/data.md)
+- [Collection permissions](./permissions/collections.md)
+- [Application permissions](./permissions/application.md)
+- [Data sandboxes](./permissions/data-sandboxes.md)
+- [Data sandbox examples](./permissions/data-sandbox-examples.md)
+- [SQL snippets folder permissions](./permissions/snippets.md)
+- [Notification permissions](./permissions/notifications.md)
+
+### Embedding
+
+- [Embedding overview](./embedding/start.md)
+- [Embedding introduction](./embedding/introduction.md)
+- [Interactive embedding](./embedding/interactive-embedding.md)
+- [Interactive embedding quick start](./embedding/interactive-embedding-quick-start-guide.md)
+- [Static embedding](./embedding/static-embedding.md)
+- [Parameters for static embeds](./embedding/static-embedding-parameters.md)
+
+### Configuration
+
+- [Configuration overview](./configuring-metabase/start.md)
+- [Setting up Metabase](./configuring-metabase/setting-up-metabase.md)
+- [General settings](./configuring-metabase/settings.md)
+- [Email](./configuring-metabase/email.md)
+- [Slack](./configuring-metabase/slack.md)
+- [Webhooks](./configuring-metabase/webhooks.md)
+- [Environment variables](./configuring-metabase/environment-variables.md)
+- [Configuration file](./configuring-metabase/config-file.md)
+- [Metabase log configuration](./configuring-metabase/log-configuration.md)
+- [Timezones](./configuring-metabase/timezones.md)
+- [Languages and localization](./configuring-metabase/localization.md)
+- [Appearance](./configuring-metabase/appearance.md)
+- [Caching query results](./configuring-metabase/caching.md)
+- [Custom maps](./configuring-metabase/custom-maps.md)
+- [Customizing the Metabase Jetty webserver](./configuring-metabase/customizing-jetty-webserver.md)
+
+### Tools
+
+- [Tools overview](./usage-and-performance-tools/start.md)
+- [Usage analytics](./usage-and-performance-tools/usage-analytics.md)
+- [Admin tools](./usage-and-performance-tools/tools.md)
+
+### Cloud
+
+- [Documentation for Metabase Cloud and Store](https://www.metabase.com/docs/latest/cloud/start)
+
+### Metabase API
+
+- [Metabase API documentation](./api-documentation.md)
+- [API tutorial](https://www.metabase.com/learn/metabase-basics/administration/administration-and-operation/metabase-api)
+
+### Troubleshooting
+
+- [Troubleshooting guides](./troubleshooting-guide/index.md)
+
+### Developer guide
+
+- [Developer guide](./developers-guide/start.md)
+
+### Paid features
+
+Some Metabase plans offer [additional features](./paid-features/start.md).
+
+## Getting help
+
+### Troubleshooting
 
 - [Troubleshooting guides](troubleshooting-guide/index.md)
 - [Metabase forum](https://discourse.metabase.com/)
-- [Configuring logging](./operations-guide/log-configuration.md)
+- [Configuring logging](./configuring-metabase/log-configuration.md)
 
-## Tutorials and guides
+### Tutorials and guides
 
-- [Learn Metabase](/learn) has a ton of articles on how to use Metabase and level up as a data analyst.
+[Learn Metabase](https://www.metabase.com/learn) has a ton of articles on how to use Metabase, data best practices, and more.
 
-## Installation and operation
+## More resources
 
-- [Installing Metabase](./operations-guide/installing-metabase.md)
-- [Setting up Metabase](setting-up-metabase.md)
-- [How to upgrade Metabase](./operations-guide/upgrading-metabase.md)
-- [Application database](./operations-guide/configuring-application-database.md)
-- [Backing up Metabase](./operations-guide/backing-up-metabase-application-data.md)
-- [Migrating to a production application database](./operations-guide/migrating-from-h2.md)
-- [Running database migrations manually](./operations-guide/running-migrations-manually.md)
-- [A word on Java versions](./operations-guide/java-versions.md)
-- [How to setup monitoring via JMX](./operations-guide/jmx-monitoring.md)
-- [Serialization: copying one Metabase instance to another](./enterprise-guide/serialization.md)
-- [Supported browsers](./administration-guide/supported-browsers.md)
+### [Discussion](https://discourse.metabase.com)
 
-## Asking questions
+Share and connect with other Metabasers.
 
-### Query builder
+### [Metabase Cloud](https://www.metabase.com/cloud/docs)
 
-- [Asking questions](./users-guide/04-asking-questions.md)
-- [Custom expressions](./users-guide/expressions.md)
-- [List of expressions: aggregations and functions](./users-guide/expressions-list.md)
-- [Visualizing data](./users-guide/05-visualizing-results.md)
-- [Using results to ask new questions](./users-guide/referencing-saved-questions-in-queries.md)
-- [Joining data](./users-guide/join.md)
+For docs specific to Metabase Cloud plans.
 
-### SQL and native queries
+### [Community stories](https://www.metabase.com/community)
 
-- [The native SQL editor](./users-guide/writing-sql.md)
-- [Viewing metadata](./users-guide/12-data-model-reference.md)
-- [SQL templates](./users-guide/13-sql-parameters.md)
-- [SQL snippets](./users-guide/sql-snippets.md)
+Practical advice from our community.
 
-### Alerts
+### [Metabase blog](https://www.metabase.com/blog)
 
-- [Setting and getting alerts](./users-guide/15-alerts.md)
+News, updates, and ideas.
 
-## Dashboards
+### [Customers](https://www.metabase.com/case_studies)
 
-- [Creating dashboards](./users-guide/07-dashboards.md)
-- [Dashboard filters](./users-guide/08-dashboard-filters.md)
-- [Interactive dashboards](./users-guide/interactive-dashboards.md)
-- [Dashboard charts with multiple series](./users-guide/09-multi-series-charting.md)
-- [Setting up dashboard subscriptions](./users-guide/dashboard-subscriptions.md)
+Real companies, real data, real stories.
 
-## Models
+### [Metabase Twitter](https://twitter.com/metabase)
 
-- [Models](./users-guide/models.md)
+We tweet stuff.
 
-## Finding things and keeping organized
+### [Source code repository on GitHub](https://github.com/metabase/metabase)
 
-- [Basic exploration](./users-guide/03-basic-exploration.md)
-- [Sharing and organizing your saved questions](./users-guide/06-sharing-answers.md)
-- [Collections](./users-guide/collections.md)
-- [Events and timelines](./users-guide/events-and-timelines.md)
+Follow us on GitHub.
 
-## People and groups
+### [List of releases](https://github.com/metabase/metabase/releases)
 
-- [Editing your account settings](./users-guide/account-settings.md)
-- [Managing people and groups](./administration-guide/04-managing-users.md)
-- [Single Sign-on (SSO)](./administration-guide/sso.html)
-  - [Google Sign-In or LDAP](./administration-guide/10-single-sign-on.html)
-  - [SAML](./enterprise-guide/authenticating-with-saml.html)
-  - [JWT](./enterprise-guide/authenticating-with-jwt.html)
-- [Password complexity](./operations-guide/changing-password-complexity.md)
-- [Session expiration](./operations-guide/changing-session-expiration.md)
+A list of all Metabase releases, including both the Enterprise Edition and the Open Source Edition.
 
-## Permissions
+### [Developers guide](./developers-guide/start.md)
 
-- [Permissions overview](./administration-guide/05-setting-permissions.md)
-- [Data permissions](./administration-guide/data-permissions.md)
-- [Collection permissions](./administration-guide/06-collections.md)
-- [Application permissions](./administration-guide/application-permissions.md)
-- [Sandboxing data based on user attributes](./enterprise-guide/data-sandboxes.md)
-- [SQL snippets folder permissions](./enterprise-guide/sql-snippets.md)
+Contribute to the Metabase open source project!
 
-## Embedding questions and dashboards
+### [Data and Business Intelligence Glossary](https://www.metabase.com/glossary)
 
-- [Public links for dashboards and questions](./administration-guide/12-public-links.md)
-- [Embedding Metabase in other applications](./administration-guide/13-embedding.md)
-- [Embedding the entire Metabase app in your own web app](./enterprise-guide/full-app-embedding.md)
-- [Embedding example apps](https://github.com/metabase/embedding-reference-apps)
-- [White labeling charts (branding)](./enterprise-guide/whitelabeling.md)
+Data jargon explained.
 
-## Databases
+### [Metabase Experts](https://www.metabase.com/partners/)
 
-- [Adding data sources](./administration-guide/01-managing-databases.md)
-- [Encrypting your database connection](./operations-guide/encrypting-database-details-at-rest.md)
-- [Editing your database metadata](./administration-guide/03-metadata-editing.md)
-- [Creating segments and metrics](./administration-guide/07-segments-and-metrics.md)
-- [SSH tunneling](./administration-guide/ssh-tunnel-for-database-connections.md)
-- [SSL certificate](./administration-guide/secure-database-connections-with-ssl-certificates.md)
-
-## Configuring Metabase
-
-- [Settings](./administration-guide/08-configuration-settings.md)
-- [Email](./administration-guide/02-setting-up-email.md)
-- [Slack](./administration-guide/09-setting-up-slack.md)
-- [Environment variables](./operations-guide/environment-variables.md)
-- [Handling timezones](./operations-guide/handling-timezones.md)
-- [Customizing the Metabase Jetty Webserver](./operations-guide/customizing-jetty-webserver.md)
-- [Default formatting](./administration-guide/19-formatting-settings.md)
-- [Localization](./administration-guide/localization.md)
-- [Caching query results](./administration-guide/14-caching.md)
-- [Custom map settings](./administration-guide/20-custom-maps.md)
-
-## Usage and performance tools
-
-- [Auditing tools](./enterprise-guide/audit.md)
-- [Tracking query errors](./enterprise-guide/tools.md)
-
-## Metabase API
-
-- [API reference](./api-documentation.md)
-- [API tutorial](/learn/administration/metabase-api)
-
-## Paid plans
-
-The Enterprise and Pro editions of Metabase offer additional features.
-
-- [Getting and activating the Enterprise edition](./enterprise-guide/activating-the-enterprise-edition.md)
-- [List of premium features](enterprise-guide/start.md)
-
-## Metabase community
-
-- [Metabase forum](https://discourse.metabase.com/)
-- [Community stories](/community)
-- [Case studies](https://www.metabase.com/case_studies/)
-- [Metabase Blog](/blog)
-- [Source code repository on GitHub](https://github.com/metabase/metabase)
-
-## Documentation guides
-
-- [Users guide](users-guide/start.md)
-- [Admin guide](administration-guide/start.md)
-- [Operations guide](operations-guide/start.md)
-- [Troubleshooting guide](troubleshooting-guide/index.md)
-- [Developers guide](developers-guide/start.md)
-
-## Metabase Cloud
-
-- [Docs specific to our hosted version](/cloud/docs)
-
-## Privacy
-
-- [Some info on privacy and GDPR](privacy.md)
-
-## Reference
-
-- [Anonymous Information Collection Reference](information-collection.md)
-- [Data and Business Intelligence Glossary](/glossary)
+If you’d like more technical resources to set up your data stack with Metabase, connect with a [Metabase Expert](https://www.metabase.com/partners/).

@@ -1,15 +1,28 @@
-import React from "react";
-import _ from "underscore";
 import { jt, t } from "ttag";
 
+import { useDocsUrl } from "metabase/common/hooks";
 import PopoverWithTrigger from "metabase/components/PopoverWithTrigger";
 import ExternalLink from "metabase/core/components/ExternalLink";
-import MetabaseSettings from "metabase/lib/settings";
+import { connect } from "metabase/lib/redux";
+import { getUpgradeUrl } from "metabase/selectors/settings";
+import type { State } from "metabase-types/store";
 
 import { ToolbarButton } from "../ToolbarButton";
+
 import { UpsellContent } from "./ToolbarUpsell.styled";
 
-export const ToolbarUpsell = () => {
+interface StateProps {
+  upgradeUrl: string;
+}
+
+type ToolbarUpsellProps = StateProps;
+
+const mapStateToProps = (state: State): StateProps => ({
+  upgradeUrl: getUpgradeUrl(state, { utm_content: "permissions_top" }),
+});
+
+const ToolbarUpsell = ({ upgradeUrl }: ToolbarUpsellProps) => {
+  const { url } = useDocsUrl("permissions/start");
   return (
     <PopoverWithTrigger
       triggerElement={<ToolbarButton text={t`Get more control`} icon="bolt" />}
@@ -17,15 +30,11 @@ export const ToolbarUpsell = () => {
     >
       <UpsellContent>
         {jt`${(
-          <ExternalLink href={MetabaseSettings.upgradeUrl()}>
+          <ExternalLink key="upsell-cta-link" href={upgradeUrl}>
             {t`Upgrade to Pro or Enterprise`}
           </ExternalLink>
         )} and disable download results, control access to the data model, promote group managers, ${(
-          <ExternalLink
-            href={MetabaseSettings.docsUrl(
-              "administration-guide/05-setting-permissions",
-            )}
-          >
+          <ExternalLink key="upsell-more-link" href={url}>
             {t`and more`}
           </ExternalLink>
         )}.`}
@@ -33,3 +42,6 @@ export const ToolbarUpsell = () => {
     </PopoverWithTrigger>
   );
 };
+
+// eslint-disable-next-line import/no-default-export -- deprecated usage
+export default connect(mapStateToProps)(ToolbarUpsell);

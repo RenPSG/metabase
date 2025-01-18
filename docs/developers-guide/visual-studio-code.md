@@ -1,9 +1,14 @@
-## Developing with Visual Studio Code
+---
+title: Developing with Visual Studio Code
+---
 
-### Debugging
+# Developing with Visual Studio Code
+
+## Debugging
 
 First, install the following extension:
-* [Debugger for Firefox](https://marketplace.visualstudio.com/items?itemName=firefox-devtools.vscode-firefox-debug)
+
+- [Debugger for Firefox](https://marketplace.visualstudio.com/items?itemName=firefox-devtools.vscode-firefox-debug)
 
 _Note_: Debugger for Chrome has been deprecated. You can safely delete it as Visual Studio Code now has [a bundled JavaScript Debugger](https://github.com/microsoft/vscode-js-debug) that covers the same functionality.
 
@@ -11,14 +16,14 @@ Before starting the debugging session, make sure that Metabase is built and runn
 
 To begin debugging Metabase, switch to the Debug view (shortcut: `Ctrl+Shift+D`) and then select one of the two launch configurations from the drop-down at the top:
 
-* Debug with Firefox, or
-* Debug with Chrome
+- Debug with Firefox, or
+- Debug with Chrome
 
 After that, begin the debugging session by choosing menu _Run_, _Start Debugging_ (shortcut: `F5`).
 
 For more details, please refer to the complete VS Code documentation on [Debugging](https://code.visualstudio.com/docs/editor/debugging).
 
-### Docker-based Workflow
+## Docker-based Workflow
 
 These instructions allow you to work on Metabase codebase on Windows, Linux, or macOS using [Visual Studio Code](https://code.visualstudio.com/), **without** manually installing the necessary dependencies. This is possible by leveraging Docker container and the Remote Containers extension from VS Code.
 
@@ -26,15 +31,16 @@ For more details, please follow the complete VS Code guide on [Developing inside
 
 Requirements:
 
-* [Visual Studio Code](https://code.visualstudio.com/) (obviously)
-* [Docker](https://www.docker.com/)
-* [Remote - Containers extension](vscode:extension/ms-vscode-remote.remote-containers) for VS Code
+- [Visual Studio Code](https://code.visualstudio.com/) (obviously)
+- [Docker](https://www.docker.com/)
+- [Remote - Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) for VS Code
 
 _Important_: Ensure that Docker is running properly and it can be used to download an image and launch a container, e.g. by running:
 
 ```
 $ docker run hello-world
 ```
+
 If everything goes well, you should see the following message:
 
 ```
@@ -56,4 +62,3 @@ Steps:
 5. After a while (after all JavaScript and Clojure dependencies are completely downloaded), open localhost:3000 with your web browser.
 
 See [here](dev-branch-docker.md) for more on running development branches of Metabase using Docker.
-

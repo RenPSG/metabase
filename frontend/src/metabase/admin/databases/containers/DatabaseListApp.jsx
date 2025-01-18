@@ -1,27 +1,25 @@
-import { connect } from "react-redux";
-
-import MetabaseSettings from "metabase/lib/settings";
-import { isSyncInProgress } from "metabase/lib/syncing";
+import _ from "underscore";
 
 import LoadingAndGenericErrorWrapper from "metabase/components/LoadingAndGenericErrorWrapper";
-import { getUserIsAdmin } from "metabase/selectors/user";
-import { PLUGIN_FEATURE_LEVEL_PERMISSIONS } from "metabase/plugins";
-import DatabaseList from "../components/DatabaseList";
-
 import Database from "metabase/entities/databases";
+import { connect } from "metabase/lib/redux";
+import { isSyncInProgress } from "metabase/lib/syncing";
+import { PLUGIN_FEATURE_LEVEL_PERMISSIONS } from "metabase/plugins";
+import { getSetting } from "metabase/selectors/settings";
+import { getUserIsAdmin } from "metabase/selectors/user";
 
+import DatabaseList from "../components/DatabaseList";
 import {
+  addSampleDatabase,
+  closeSyncingModal,
+  deleteDatabase,
+} from "../database";
+import {
+  getAddSampleDatabaseError,
   getDeletes,
   getDeletionError,
   getIsAddingSampleDatabase,
-  getAddSampleDatabaseError,
 } from "../selectors";
-import {
-  deleteDatabase,
-  addSampleDatabase,
-  closeSyncingModal,
-} from "../database";
-import _ from "underscore";
 
 const RELOAD_INTERVAL = 2000;
 
@@ -42,8 +40,9 @@ const mapStateToProps = (state, props) => ({
   addSampleDatabaseError: getAddSampleDatabaseError(state),
 
   created: props.location.query.created,
-  engines: MetabaseSettings.get("engines"),
-  showSyncingModal: MetabaseSettings.get("show-database-syncing-modal"),
+  createdDbId: props.location.query.createdDbId,
+  engines: getSetting(state, "engines"),
+  showSyncingModal: getSetting(state, "show-database-syncing-modal"),
 
   deletes: getDeletes(state),
   deletionError: getDeletionError(state),

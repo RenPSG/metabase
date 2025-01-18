@@ -1,25 +1,25 @@
-import React, { useLayoutEffect, useRef, useState } from "react";
-// eslint-disable-next-line import/named
-import { Placement } from "tippy.js";
+import type { FloatingPosition } from "@mantine/core/lib/Floating";
+import type { CSSProperties, ReactNode } from "react";
 
-import Tooltip from "metabase/components/Tooltip";
-import resizeObserver from "metabase/lib/resize-observer";
-import { EllipsifiedRoot } from "./Ellipsified.styled";
+import { useIsTruncated } from "metabase/hooks/use-is-truncated";
+import { Text, type TextProps, Tooltip } from "metabase/ui";
 
 interface EllipsifiedProps {
-  style?: React.CSSProperties;
+  style?: CSSProperties;
   className?: string;
   showTooltip?: boolean;
   alwaysShowTooltip?: boolean;
-  tooltip?: string;
-  children?: React.ReactNode;
-  tooltipMaxWidth?: React.CSSProperties["maxWidth"];
+  tooltip?: ReactNode;
+  children?: ReactNode;
+  tooltipMaxWidth?: number | "auto";
   lines?: number;
-  placement?: Placement;
+  multiline?: boolean;
+  placement?: FloatingPosition;
   "data-testid"?: string;
+  id?: string;
 }
 
-const Ellipsified = ({
+export const Ellipsified = ({
   style,
   className,
   showTooltip = true,
@@ -27,49 +27,44 @@ const Ellipsified = ({
   tooltip,
   children,
   tooltipMaxWidth,
-  lines,
+  lines = 1,
+  multiline = false,
   placement = "top",
   "data-testid": dataTestId,
+  id,
 }: EllipsifiedProps) => {
-  const [isTruncated, setIsTruncated] = useState(false);
-  const rootRef = useRef<HTMLDivElement | null>(null);
+  const canSkipTooltipRendering = !showTooltip && !alwaysShowTooltip;
+  const { isTruncated, ref } = useIsTruncated<HTMLDivElement>({
+    disabled: canSkipTooltipRendering,
+  });
+  const isEnabled =
+    (showTooltip && (isTruncated || alwaysShowTooltip)) || false;
 
-  useLayoutEffect(() => {
-    const element = rootRef.current;
-    if (!element) {
-      return;
-    }
-    const handleResize = () => {
-      const isTruncated =
-        element.scrollHeight > element.clientHeight ||
-        element.offsetWidth < element.scrollWidth;
-      setIsTruncated(isTruncated);
-    };
-
-    handleResize();
-    resizeObserver.subscribe(element, handleResize);
-
-    return () => resizeObserver.unsubscribe(element, handleResize);
-  }, []);
+  const truncatedProps: Partial<TextProps> =
+    lines > 1 ? { lineClamp: lines } : { truncate: true };
 
   return (
     <Tooltip
-      tooltip={tooltip || children || " "}
-      isEnabled={(showTooltip && (isTruncated || alwaysShowTooltip)) || false}
-      maxWidth={tooltipMaxWidth}
-      placement={placement}
+      data-testid="ellipsified-tooltip"
+      disabled={!isEnabled}
+      label={canSkipTooltipRendering ? undefined : tooltip || children || " "}
+      position={placement}
+      width={tooltipMaxWidth}
+      multiline={multiline}
     >
-      <EllipsifiedRoot
-        ref={rootRef}
+      <Text
+        c="inherit"
+        ref={ref}
         className={className}
-        lines={lines}
         style={style}
         data-testid={dataTestId}
+        id={id}
+        fz="inherit"
+        lh="inherit"
+        {...truncatedProps}
       >
         {children}
-      </EllipsifiedRoot>
+      </Text>
     </Tooltip>
   );
 };
-
-export default Ellipsified;

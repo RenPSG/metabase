@@ -1,7 +1,15 @@
-import { createSelector } from "reselect";
+import { createSelector } from "@reduxjs/toolkit";
+
+import {
+  cardApi,
+  persistApi,
+  skipToken,
+  useGetPersistedInfoByCardQuery,
+  useGetPersistedInfoQuery,
+  useListPersistedInfoQuery,
+} from "metabase/api";
+import { createEntity, entityCompatibleQuery } from "metabase/lib/entities";
 import { PersistedModelSchema } from "metabase/schema";
-import { createEntity } from "metabase/lib/entities";
-import { CardApi, PersistedModelsApi } from "metabase/services";
 
 const REFRESH_CACHE = "metabase/entities/persistedModels/REFRESH_CACHE";
 
@@ -11,24 +19,62 @@ const getPersistedModelInfoByModelId = createSelector(
     Object.values(persistedModels).find(info => info.card_id === modelId),
 );
 
+/**
+ * @deprecated use "metabase/api" instead
+ */
 const PersistedModels = createEntity({
   name: "persistedModels",
   nameOne: "persistedModel",
   path: "/api/persist",
   schema: PersistedModelSchema,
 
+  rtk: {
+    getUseGetQuery: () => ({
+      useGetQuery,
+    }),
+    useListQuery: useListPersistedInfoQuery,
+  },
+
   api: {
-    get: ({ id, type }, ...args) => {
+    get: ({ id, type }, options, dispatch) => {
       return type === "byModelId"
-        ? PersistedModelsApi.getForModel({ id }, ...args)
-        : PersistedModelSchema.get({ id }, ...args);
+        ? entityCompatibleQuery(
+            id,
+            dispatch,
+            persistApi.endpoints.getPersistedInfoByCard,
+          )
+        : entityCompatibleQuery(
+            id,
+            dispatch,
+            persistApi.endpoints.getPersistedInfo,
+          );
+    },
+    list: (entityQuery, dispatch) =>
+      entityCompatibleQuery(
+        entityQuery,
+        dispatch,
+        persistApi.endpoints.listPersistedInfo,
+      ),
+    create: () => {
+      throw new TypeError("PersistedModels.api.create is not supported");
+    },
+    update: () => {
+      throw new TypeError("PersistedModels.api.update is not supported");
+    },
+    delete: () => {
+      throw new TypeError("PersistedModels.api.delete is not supported");
     },
   },
 
   objectActions: {
-    refreshCache: async job => {
-      await CardApi.refreshModelCache({ id: job.card_id });
-      return { type: REFRESH_CACHE, payload: job };
+    refreshCache: job => async dispatch => {
+      await entityCompatibleQuery(
+        job.card_id,
+        dispatch,
+        cardApi.endpoints.refreshModelCache,
+      );
+
+      dispatch({ type: REFRESH_CACHE, payload: job });
     },
   },
 
@@ -36,8 +82,8 @@ const PersistedModels = createEntity({
     getByModelId: getPersistedModelInfoByModelId,
   },
 
-  reducer: (state = {}, { type, payload }) => {
-    if (type === REFRESH_CACHE) {
+  reducer: (state = {}, { type, payload, error }) => {
+    if (type === REFRESH_CACHE && !error) {
       return {
         ...state,
         [payload.id]: {
@@ -51,5 +97,19 @@ const PersistedModels = createEntity({
     return state;
   },
 });
+
+const useGetQuery = ({ id, type }, options) => {
+  const persistedInfoByCard = useGetPersistedInfoByCardQuery(
+    type === "byModelId" ? id : skipToken,
+    options,
+  );
+
+  const persistedInfo = useGetPersistedInfoQuery(
+    type === "byModelId" ? skipToken : id,
+    options,
+  );
+
+  return type === "byModelId" ? persistedInfoByCard : persistedInfo;
+};
 
 export default PersistedModels;

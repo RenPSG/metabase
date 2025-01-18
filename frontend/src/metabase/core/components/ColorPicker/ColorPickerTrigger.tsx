@@ -1,7 +1,9 @@
-import React, { forwardRef, HTMLAttributes, Ref } from "react";
-import ColorPill from "metabase/core/components/ColorPill";
+import type { HTMLAttributes, Ref } from "react";
+import { forwardRef } from "react";
+
 import ColorInput from "metabase/core/components/ColorInput";
-import { TriggerContainer } from "./ColorPicker.styled";
+import { ColorPill } from "metabase/core/components/ColorPill";
+import { Group } from "metabase/ui";
 
 export interface ColorPickerTriggerProps
   extends Omit<HTMLAttributes<HTMLDivElement>, "onChange"> {
@@ -23,7 +25,7 @@ const ColorPickerTrigger = forwardRef(function ColorPickerTrigger(
   ref: Ref<HTMLDivElement>,
 ) {
   return (
-    <TriggerContainer {...props} ref={ref}>
+    <Group {...props} ref={ref} noWrap>
       <ColorPill color={value} isAuto={isAuto} onClick={onClick} />
       <ColorInput
         value={!isAuto ? value : undefined}
@@ -31,8 +33,9 @@ const ColorPickerTrigger = forwardRef(function ColorPickerTrigger(
         fullWidth
         onChange={onChange}
       />
-    </TriggerContainer>
+    </Group>
   );
 });
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default ColorPickerTrigger;

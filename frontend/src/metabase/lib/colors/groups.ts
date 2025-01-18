@@ -1,41 +1,68 @@
-import { times, unzip } from "lodash";
+import _ from "underscore";
+
 import { ACCENT_COUNT, color } from "./palette";
-import { AccentColorOptions } from "./types";
+import type { AccentColorOptions, ColorPalette } from "./types";
 
-export const getAccentColors = ({
-  main = true,
-  light = true,
-  dark = true,
-  harmony = false,
-}: AccentColorOptions = {}) => {
+export const getAccentColors = (
+  {
+    main = true,
+    light = true,
+    dark = true,
+    harmony = false,
+    gray = true,
+  }: AccentColorOptions = {},
+  palette?: ColorPalette,
+) => {
   const ranges = [];
-  main && ranges.push(getMainAccentColors());
-  light && ranges.push(getLightAccentColors());
-  dark && ranges.push(getDarkAccentColors());
+  main && ranges.push(getMainAccentColors(palette, gray));
+  light && ranges.push(getLightAccentColors(palette, gray));
+  dark && ranges.push(getDarkAccentColors(palette, gray));
 
-  return harmony ? unzip(ranges).flat() : ranges.flat();
+  return harmony ? _.unzip(ranges).flat() : ranges.flat();
 };
 
-export const getMainAccentColors = () => {
-  return times(ACCENT_COUNT, i => color(`accent${i}`));
+const getBaseAccentsNames = (withGray = false) => {
+  const accents = _.times(ACCENT_COUNT, i => `accent${i}`);
+  if (withGray) {
+    accents.push("accent-gray");
+  }
+
+  return accents;
 };
 
-export const getLightAccentColors = () => {
-  return times(ACCENT_COUNT, i => color(`accent${i}-light`));
+export const getMainAccentColors = (
+  palette?: ColorPalette,
+  withGray = false,
+) => {
+  return getBaseAccentsNames(withGray).map(accent => color(accent, palette));
 };
 
-export const getDarkAccentColors = () => {
-  return times(ACCENT_COUNT, i => color(`accent${i}-dark`));
+export const getLightAccentColors = (
+  palette?: ColorPalette,
+  withGray = false,
+) => {
+  return getBaseAccentsNames(withGray).map(accent =>
+    color(`${accent}-light`, palette),
+  );
+};
+
+export const getDarkAccentColors = (
+  palette?: ColorPalette,
+  withGray = false,
+) => {
+  return getBaseAccentsNames(withGray).map(accent =>
+    color(`${accent}-dark`, palette),
+  );
 };
 
 export const getStatusColorRanges = () => {
   return [
-    [color("error"), color("white"), color("success")],
+    [color("error"), color("bg-white"), color("success")],
     [color("error"), color("warning"), color("success")],
   ];
 };
 
-export const getPreferredColor = (key: string) => {
+export const getPreferredColor = (key: string, palette?: ColorPalette) => {
   switch (key.toLowerCase()) {
     case "success":
     case "succeeded":
@@ -47,7 +74,10 @@ export const getPreferredColor = (key: string) => {
     case "accepted":
     case "active":
     case "profit":
-      return color("success");
+      return color("success", palette);
+    case "cancel":
+    case "canceled":
+    case "cancelled":
     case "error":
     case "fail":
     case "failed":
@@ -60,17 +90,17 @@ export const getPreferredColor = (key: string) => {
     case "cost":
     case "deleted":
     case "pending":
-      return color("error");
+      return color("error", palette);
     case "warn":
     case "warning":
     case "incomplete":
     case "unstable":
-      return color("warning");
+      return color("warning", palette);
     case "count":
-      return color("brand");
+      return color("accent0", palette);
     case "sum":
-      return color("accent1");
+      return color("accent1", palette);
     case "average":
-      return color("accent2");
+      return color("accent2", palette);
   }
 };

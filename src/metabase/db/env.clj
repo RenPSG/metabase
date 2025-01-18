@@ -1,7 +1,7 @@
 (ns metabase.db.env
   "Logic related to fetching and working with the connection details for the application database. These are provided by
   environment variables -- either as a single JDBC connection URL string (`MB_DB_CONNECTION_URI`) or as broken-out
-  enviornment variables e.g. `MB_DB_TYPE`, `MB_DB_HOST`, etc. `MB_DB_CONNECTION_URI` is used preferentially if both
+  environment variables e.g. `MB_DB_TYPE`, `MB_DB_HOST`, etc. `MB_DB_CONNECTION_URI` is used preferentially if both
   are specified.
 
   There are three ways you can specify application JDBC connection information for Metabase:
@@ -20,12 +20,16 @@
   This namespace exposes the vars [[db-type]] and [[data-source]] based on the aforementioned environment variables.
   Normally you should use the equivalent functions in [[metabase.db.connection]] which can be overridden rather than
   using this namespace directly."
-  (:require [clojure.java.io :as io]
-            [clojure.string :as str]
-            [clojure.tools.logging :as log]
-            [metabase.config :as config]
-            [metabase.db.data-source :as mdb.data-source]
-            [metabase.util :as u]))
+  (:require
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [metabase.config :as config]
+   [metabase.db.data-source :as mdb.data-source]
+   [metabase.util :as u]
+   [metabase.util.log :as log]
+   [metabase.util.malli :as mu]))
+
+(set! *warn-on-reflection* true)
 
 ;;;; [[env->db-type]]
 
@@ -36,12 +40,10 @@
         "postgresql" :postgres
         (keyword subprotocol)))))
 
-(defn- env->db-type
+(mu/defn- env->db-type :- [:enum :postgres :mysql :h2]
   [{:keys [mb-db-connection-uri mb-db-type]}]
-  {:post [(#{:postgres :mysql :h2} %)]}
   (or (some-> mb-db-connection-uri raw-connection-string->type)
       mb-db-type))
-
 
 ;;;; [[env->DataSource]]
 
@@ -75,35 +77,66 @@
 (defn- broken-out-details
   "Connection details that can be used when pretending the Metabase DB is itself a `Database` (e.g., to use the Generic
   SQL driver functions on the Metabase DB itself)."
-  [db-type {:keys [mb-db-dbname mb-db-host mb-db-pass mb-db-port mb-db-user], :as env-vars}]
+  [db-type {:keys [mb-db-dbname mb-db-host mb-db-pass mb-db-port mb-db-user mb-db-azure-managed-identity-client-id]
+            :as   env-vars}]
   (if (= db-type :h2)
     (assoc h2-connection-properties
            :db (env->db-file env-vars))
-    {:host     mb-db-host
-     :port     mb-db-port
-     :db       mb-db-dbname
-     :user     mb-db-user
-     :password mb-db-pass}))
+    {:host                             mb-db-host
+     :port                             mb-db-port
+     :db                               mb-db-dbname
+     :user                             mb-db-user
+     :password                         mb-db-pass
+     :azure-managed-identity-client-id mb-db-azure-managed-identity-client-id}))
 
 (defn- env->DataSource
-  [db-type {:keys [mb-db-connection-uri mb-db-user mb-db-pass], :as env-vars}]
+  [db-type {:keys [mb-db-connection-uri mb-db-user mb-db-pass mb-db-azure-managed-identity-client-id], :as env-vars}]
   (if mb-db-connection-uri
-    (mdb.data-source/raw-connection-string->DataSource mb-db-connection-uri mb-db-user mb-db-pass)
+    (mdb.data-source/raw-connection-string->DataSource
+     mb-db-connection-uri mb-db-user mb-db-pass mb-db-azure-managed-identity-client-id)
     (mdb.data-source/broken-out-details->DataSource db-type (broken-out-details db-type env-vars))))
 
+;;;; exports: [[db-type]], [[db-file]], and [[data-source]] created using environment variables.
 
-;;;; exports: [[db-type]], [[db-file]], and [[data-source]] created using enviornment variables.
+(defmulti ^:private env-defaults
+  {:arglists '([db-type])}
+  keyword)
 
-(def ^:private env
-  {:mb-db-type           (config/config-kw :mb-db-type)
-   :mb-db-in-memory      (config/config-bool :mb-db-in-memory)
-   :mb-db-file           (config/config-str :mb-db-file)
-   :mb-db-connection-uri (config/config-str :mb-db-connection-uri)
-   :mb-db-host           (config/config-str :mb-db-host)
-   :mb-db-port           (config/config-int :mb-db-port)
-   :mb-db-dbname         (config/config-str :mb-db-dbname)
-   :mb-db-user           (config/config-str :mb-db-user)
-   :mb-db-pass           (config/config-str :mb-db-pass)})
+(defmethod env-defaults :h2
+  [_db-type]
+  nil)
+
+(defmethod env-defaults :mysql
+  [_db-type]
+  {:mb-db-host "localhost"
+   :mb-db-port 3306})
+
+(defmethod env-defaults :postgres
+  [_db-type]
+  {:mb-db-host "localhost"
+   :mb-db-port 5432})
+
+(defn- env* [db-type]
+  (merge-with
+   (fn [env-value default-value]
+     (if (nil? env-value)
+       default-value
+       env-value))
+   {:mb-db-type                             db-type
+    :mb-db-in-memory                        (config/config-bool :mb-db-in-memory)
+    :mb-db-file                             (config/config-str :mb-db-file)
+    :mb-db-connection-uri                   (config/config-str :mb-db-connection-uri)
+    :mb-db-host                             (config/config-str :mb-db-host)
+    :mb-db-port                             (config/config-int :mb-db-port)
+    :mb-db-dbname                           (config/config-str :mb-db-dbname)
+    :mb-db-user                             (config/config-str :mb-db-user)
+    :mb-db-pass                             (config/config-str :mb-db-pass)
+    :mb-db-azure-managed-identity-client-id (config/config-str :mb-db-azure-managed-identity-client-id)}
+   (env-defaults db-type)))
+
+(def env
+  "Metabase Datatbase environment. Used to setup *application-db* and audit-db for enterprise users."
+  (env* (config/config-kw :mb-db-type)))
 
 (def db-type
   "Keyword type name of the application DB details specified by environment variables. Matches corresponding driver

@@ -1,3 +1,7 @@
+---
+title: Plugin manifests
+---
+
 # Plugin manifests
 
 Metabase plugin JARs contain a _plugin manifest_ -- a top-level file named `metabase-plugin.yaml`. When Metabase launches, it iterates over every JAR in the plugins directory, and looks for the manifest in each. This manifest tells Metabase what the plugin provides and how to initialize it.
@@ -39,7 +43,7 @@ You _can_ (but shouldn't) set a driver to `lazy-load: false`, as this will make 
 
 ## Plugin initialization
 
-Metabase will initialize plugins automatically as needed. Initialization goes something like this: Metabase adds the driver to the classpath, then it performs ea `init` section of the plugin manifest, in order. In the [example manifest above](#example-manifest), there are two steps, a `load-namespace` step, and a `register-jdbc-driver` step:
+Metabase will initialize plugins automatically as needed. Initialization goes something like this: Metabase adds the driver to the classpath, then it performs each `init` section of the plugin manifest, in order. In the [example manifest above](#example-manifest), there are two steps, a `load-namespace` step, and a `register-jdbc-driver` step:
 
 ```yaml
 init:
@@ -51,9 +55,9 @@ init:
 
 ## Loading namespaces
 
-You'll need to add one or more `load-namespace` steps to your driver manifest to tell Metabase which namespaces contain your driver method implementations. In the example above, the namespace is `metabase.driver.sqlite`. `load-namespace` calls `require` the [normal Clojure way, meaning it will load other namespaces listed in the `:require` section of its namespace declaration as needed. If your driver's method implementations are split across multiple namespaces, make sure they'll get loaded as well -- you can either have the main namespace handle this (e.g., by including them in the `:require` form in the namespace declaration) or by adding additional `load-namespace` steps.
+You'll need to add one or more `load-namespace` steps to your driver manifest to tell Metabase which namespaces contain your driver method implementations. In the example above, the namespace is `metabase.driver.sqlite`. `load-namespace` calls `require` the [normal Clojure way](https://clojuredocs.org/clojure.core/require), meaning it will load other namespaces listed in the `:require` section of its namespace declaration as needed. If your driver's method implementations are split across multiple namespaces, make sure they'll get loaded as well -- you can either have the main namespace handle this (e.g., by including them in the `:require` form in the namespace declaration) or by adding additional `load-namespace` steps.
 
-For some background on namespaces, see [Clojure namespaces][clojure-namespace].
+For some background on namespaces, see [Clojure namespaces](https://clojure.org/guides/learn/namespaces).
 
 ## Registering JDBC Drivers
 
@@ -63,7 +67,7 @@ The if-you're-interested reason is that Java's JDBC `DriverManager` won't use JD
 
 ## Building the driver
 
-To build a driver as a plugin JAR, check out the [Build-driver scripts README](https://github.com/metabase/metabase/tree/master/bin/build-drivers).
+To build a driver as a plugin JAR, check out the [Build-driver scripts README](https://github.com/metabase/metabase/tree/master/bin/build-drivers.md).
 
 Place the JAR you built in your Metabase's `/plugins` directory, and you're off to the races.
 
@@ -71,7 +75,7 @@ Place the JAR you built in your Metabase's `/plugins` directory, and you're off 
 
 Here's an example plugin manifest with comments to get you started on writing your own.
 
-```
+```txt
 # Basic user-facing information about the driver goes under the info: key
 info:
 
@@ -193,10 +197,6 @@ driver:
     - merge:
       - port
       - placeholder: 1433
-
-  # You can also tell Metabase to include SSL tunnel configuration options with
-  # connection-properties-include-tunnel-config (default: false)
-  connection-properties-include-tunnel-config: true
 
 # Steps to take to initialize the plugin. For lazy-load drivers, this
 # is delayed until the driver is initialized the first time we connect

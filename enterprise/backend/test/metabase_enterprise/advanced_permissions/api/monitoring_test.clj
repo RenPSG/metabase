@@ -1,16 +1,15 @@
 (ns metabase-enterprise.advanced-permissions.api.monitoring-test
   "Permisisons tests for API that needs to be enforced by Application Permissions of type `:monitoring`."
-  (:require [clojure.test :refer :all]
-            [metabase.models :refer [TaskHistory]]
-            [metabase.models.permissions :as perms]
-            [metabase.public-settings.premium-features-test :as premium-features-test]
-            [metabase.test :as mt]))
+  (:require
+   [clojure.test :refer :all]
+   [metabase.models.permissions :as perms]
+   [metabase.test :as mt]))
 
 (deftest task-test
   (testing "/api/task/*"
     (mt/with-user-in-groups [group {:name "New Group"}
                              user  [group]]
-      (mt/with-temp TaskHistory [task]
+      (mt/with-temp [:model/TaskHistory task]
         (letfn [(get-tasks [user status]
                   (testing (format "get task with %s user" (mt/user-descriptor user))
                     (mt/user-http-request user :get status "task")))
@@ -20,7 +19,7 @@
                   (testing (format "get task info with %s user" (mt/user-descriptor user))
                     (mt/user-http-request user :get status "task/info")))]
           (testing "if `advanced-permissions` is disabled, require admins"
-            (premium-features-test/with-premium-features #{}
+            (mt/with-premium-features #{}
               (get-tasks user 403)
               (get-single-task user 403)
               (get-task-info user 403)
@@ -29,7 +28,7 @@
               (get-task-info :crowberto 200)))
 
           (testing "if `advanced-permissions` is enabled"
-            (premium-features-test/with-premium-features #{:advanced-permissions}
+            (mt/with-premium-features #{:advanced-permissions}
               (testing "still fail if user's group doesn't have `monitoring` permission"
                 (get-tasks user 403)
                 (get-single-task user 403)
@@ -59,7 +58,7 @@
                   (mt/user-http-request user :get status "util/diagnostic_info/connection_pool_info")))]
 
         (testing "if `advanced-permissions` is disabled, require admins"
-          (premium-features-test/with-premium-features #{}
+          (mt/with-premium-features #{}
             (get-logs user 403)
             (get-stats user 403)
             (get-bug-report-detail user 403)
@@ -70,19 +69,19 @@
             (get-db-connection-info :crowberto 200)))
 
         (testing "if `advanced-permissions` is enabled"
-          (premium-features-test/with-premium-features #{:advanced-permissions}
+          (mt/with-premium-features #{:advanced-permissions}
             (testing "still fail if user's group doesn't have `monitoring` permission"
               (get-logs user 403)
               (get-stats user 403)
               (get-bug-report-detail user 403)
               (get-db-connection-info user 403))
 
-          (testing "allowed if user's group has `monitoring` permission"
-            (perms/grant-application-permissions! group :monitoring)
-            (get-logs user 200)
-            (get-stats user 200)
-            (get-bug-report-detail user 200)
-            (get-db-connection-info user 200))))))))
+            (testing "allowed if user's group has `monitoring` permission"
+              (perms/grant-application-permissions! group :monitoring)
+              (get-logs user 200)
+              (get-stats user 200)
+              (get-bug-report-detail user 200)
+              (get-db-connection-info user 200))))))))
 
 (deftest persistence-test
   (testing "/api/persist"
@@ -98,7 +97,7 @@
           (fetch-persisted-info :rasta 403))
 
         (testing "if `advanced-permissions` is enabled"
-          (premium-features-test/with-premium-features #{:advanced-permissions}
+          (mt/with-premium-features #{:advanced-permissions}
             (testing "still fail if user's group doesn't have `setting` permission,"
               (fetch-persisted-info :crowberto 200)
               (fetch-persisted-info user 403)

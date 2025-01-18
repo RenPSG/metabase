@@ -1,13 +1,24 @@
+---
+title: "Slack"
+summary: |
+  /api/slack endpoints.
+---
+
 # Slack
 
 /api/slack endpoints.
 
-  - [GET /api/slack/manifest](#get-apislackmanifest)
-  - [PUT /api/slack/settings](#put-apislacksettings)
-
 ## `GET /api/slack/manifest`
 
 Returns the YAML manifest file that should be used to bootstrap new Slack apps.
+
+## `POST /api/slack/bug-report`
+
+Send diagnostic information to the configured Slack channels.
+
+### PARAMS:
+
+-  **`diagnosticInfo`** map.
 
 ## `PUT /api/slack/settings`
 
@@ -19,9 +30,11 @@ Update Slack related settings. You must be a superuser to do this. Also updates 
 
 ### PARAMS:
 
-*  **`slack-app-token`** value may be nil, or if non-nil, value must be a non-blank string.
+-  **`slack-app-token`** nullable value must be a non-blank string.
 
-*  **`slack-files-channel`** value may be nil, or if non-nil, value must be a non-blank string.
+-  **`slack-files-channel`** nullable value must be a non-blank string.
+
+-  **`slack-bug-report-channel`** nullable string.
 
 ---
 

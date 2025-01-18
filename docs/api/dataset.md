@@ -1,22 +1,22 @@
+---
+title: "Dataset"
+summary: |
+  /api/dataset endpoints.
+---
+
 # Dataset
 
 /api/dataset endpoints.
 
-  - [POST /api/dataset/](#post-apidataset)
-  - [POST /api/dataset/:export-format](#post-apidatasetexport-format)
-  - [POST /api/dataset/duration](#post-apidatasetduration)
-  - [POST /api/dataset/native](#post-apidatasetnative)
-  - [POST /api/dataset/pivot](#post-apidatasetpivot)
-
 ## `POST /api/dataset/`
 
-Execute a query and retrieve the results in the usual format.
+Execute a query and retrieve the results in the usual format. The query will not use the cache.
 
 ### PARAMS:
 
-*  **`database`** value may be nil, or if non-nil, value must be an integer.
+-  **`database`** nullable integer.
 
-*  **`query`**
+-  **`query`**
 
 ## `POST /api/dataset/:export-format`
 
@@ -24,21 +24,15 @@ Execute a query and download the result data as a file in the specified format.
 
 ### PARAMS:
 
-*  **`export-format`** value must be one of: `api`, `csv`, `json`, `xlsx`.
+-  **`export-format`** enum of csv, api, xlsx, json.
 
-*  **`query`** value must be a valid JSON string.
+-  **`query`** value must be a valid JSON string.
 
-*  **`visualization_settings`** value must be a valid JSON string.
+-  **`visualization_settings`** value must be a valid JSON string.
 
-## `POST /api/dataset/duration`
+-  **`pivot_results`** nullable value must be a valid boolean string ('true' or 'false').
 
-Get historical query execution duration.
-
-### PARAMS:
-
-*  **`database`** 
-
-*  **`query`**
+-  **`format_rows`** nullable value must be a valid boolean string ('true' or 'false').
 
 ## `POST /api/dataset/native`
 
@@ -46,7 +40,33 @@ Fetch a native version of an MBQL query.
 
 ### PARAMS:
 
-*  **`query`**
+-  **`database`** value must be an integer greater than zero.
+
+-  **`pretty`** nullable boolean.
+
+-  **`query`**
+
+## `POST /api/dataset/parameter/search/:query`
+
+Return parameter values for cards or dashboards that are being edited. Expects a query string at `?query=foo`.
+
+### PARAMS:
+
+-  **`query`** value must be a non-blank string.
+
+-  **`parameter`** parameter must be a map with :id and :type keys.
+
+-  **`field_ids`** nullable sequence of value must be an integer greater than zero.
+
+## `POST /api/dataset/parameter/values`
+
+Return parameter values for cards or dashboards that are being edited.
+
+### PARAMS:
+
+-  **`parameter`** parameter must be a map with :id and :type keys.
+
+-  **`field_ids`** nullable sequence of value must be an integer greater than zero.
 
 ## `POST /api/dataset/pivot`
 
@@ -54,9 +74,19 @@ Generate a pivoted dataset for an ad-hoc query.
 
 ### PARAMS:
 
-*  **`database`** value may be nil, or if non-nil, value must be an integer.
+-  **`database`** nullable value must be an integer greater than zero.
 
-*  **`query`**
+-  **`query`**
+
+## `POST /api/dataset/query_metadata`
+
+Get all of the required query metadata for an ad-hoc query.
+
+### PARAMS:
+
+-  **`database`** value must be an integer greater than zero.
+
+-  **`query`**
 
 ---
 

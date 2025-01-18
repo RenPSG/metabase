@@ -1,18 +1,18 @@
-import React, { useCallback, useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { t } from "ttag";
-import Form from "metabase/containers/Form";
-import forms from "metabase/entities/timelines/forms";
-import { getDefaultTimelineIcon } from "metabase/lib/timelines";
+
 import { canonicalCollectionId } from "metabase/collections/utils";
-import { Collection, Timeline } from "metabase-types/api";
-import ModalBody from "../ModalBody";
-import ModalHeader from "../ModalHeader";
+import ModalContent from "metabase/components/ModalContent";
+import { getDefaultTimelineIcon } from "metabase/lib/timelines";
+import type { Collection, TimelineData } from "metabase-types/api";
+
+import TimelineForm from "../TimelineForm";
 
 export interface NewTimelineModalProps {
   collection: Collection;
-  onSubmit: (values: Partial<Timeline>, collection: Collection) => void;
+  onSubmit: (values: TimelineData, collection: Collection) => void;
   onSubmitSuccess?: () => void;
-  onCancel?: () => void;
+  onCancel: () => void;
   onClose?: () => void;
 }
 
@@ -24,15 +24,11 @@ const NewTimelineModal = ({
   onClose,
 }: NewTimelineModalProps): JSX.Element => {
   const initialValues = useMemo(() => {
-    return {
-      collection_id: canonicalCollectionId(collection.id),
-      icon: getDefaultTimelineIcon(),
-      default: false,
-    };
+    return getInitialValues(collection);
   }, [collection]);
 
   const handleSubmit = useCallback(
-    async (values: Partial<Timeline>) => {
+    async (values: TimelineData) => {
       await onSubmit(values, collection);
       onSubmitSuccess?.();
     },
@@ -40,19 +36,24 @@ const NewTimelineModal = ({
   );
 
   return (
-    <div>
-      <ModalHeader title={t`New event timeline`} onClose={onClose} />
-      <ModalBody>
-        <Form
-          form={forms.details}
-          initialValues={initialValues}
-          isModal={true}
-          onSubmit={handleSubmit}
-          onClose={onCancel}
-        />
-      </ModalBody>
-    </div>
+    <ModalContent title={t`New event timeline`} onClose={onClose}>
+      <TimelineForm
+        initialValues={initialValues}
+        onSubmit={handleSubmit}
+        onCancel={onCancel}
+      />
+    </ModalContent>
   );
 };
 
+const getInitialValues = (collection: Collection): TimelineData => ({
+  name: "",
+  description: null,
+  collection_id: canonicalCollectionId(collection.id),
+  icon: getDefaultTimelineIcon(),
+  default: false,
+  archived: false,
+});
+
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default NewTimelineModal;

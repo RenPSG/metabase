@@ -1,34 +1,34 @@
-import { MouseEvent } from "react";
-import { Column } from "metabase-types/types/Dataset";
+import { NULL_DISPLAY_VALUE } from "metabase/lib/constants";
 import { formatValue } from "metabase/lib/formatting";
-import { VisualizationSettings } from "./types";
+import type { OptionsType } from "metabase/lib/formatting/types";
+import type {
+  ComputedVisualizationSettings,
+  RemappingHydratedDatasetColumn,
+} from "metabase/visualizations/types";
+import type { DatasetColumn } from "metabase-types/api";
 
 export const formatValueForTooltip = ({
   value,
   column,
   settings,
+  isAlreadyScaled,
 }: {
   value?: unknown;
-  column?: Column;
-  settings?: VisualizationSettings;
-}) =>
-  formatValue(value, {
+  column?: RemappingHydratedDatasetColumn | DatasetColumn | null;
+  settings?: ComputedVisualizationSettings;
+  isAlreadyScaled?: boolean;
+}) => {
+  const options: OptionsType = {
     ...(settings && settings.column && column
       ? settings.column(column)
       : { column }),
     type: "tooltip",
     majorWidth: 0,
-  });
+  };
 
-export const getEventTarget = (event: MouseEvent) => {
-  let target = document.getElementById("popover-event-target");
-  if (!target) {
-    target = document.createElement("div");
-    target.id = "popover-event-target";
-    document.body.appendChild(target);
+  if (isAlreadyScaled) {
+    options.scale = 1;
   }
-  target.style.left = event.clientX - 3 + "px";
-  target.style.top = event.clientY - 3 + "px";
 
-  return target;
+  return formatValue(value, options) ?? NULL_DISPLAY_VALUE;
 };

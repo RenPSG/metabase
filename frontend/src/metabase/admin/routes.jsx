@@ -1,79 +1,67 @@
-import React from "react";
-import { IndexRoute, IndexRedirect } from "react-router";
-import { t } from "ttag";
+import { Fragment } from "react";
+import { IndexRedirect, IndexRoute } from "react-router";
 import { routerActions } from "react-router-redux";
-import { UserAuthWrapper } from "redux-auth-wrapper";
+import { connectedReduxRedirect } from "redux-auth-wrapper/history3/redirect";
+import { t } from "ttag";
 
-import { Route } from "metabase/hoc/Title";
+import AdminApp from "metabase/admin/app/components/AdminApp";
+import DatabaseEditApp from "metabase/admin/databases/containers/DatabaseEditApp";
+import DatabaseListApp from "metabase/admin/databases/containers/DatabaseListApp";
+import DataModelApp from "metabase/admin/datamodel/containers/DataModelApp";
+import RevisionHistoryApp from "metabase/admin/datamodel/containers/RevisionHistoryApp";
+import SegmentApp from "metabase/admin/datamodel/containers/SegmentApp";
+import SegmentListApp from "metabase/admin/datamodel/containers/SegmentListApp";
+import { getMetadataRoutes } from "metabase/admin/datamodel/metadata/routes";
+import { AdminPeopleApp } from "metabase/admin/people/containers/AdminPeopleApp";
+import { EditUserModal } from "metabase/admin/people/containers/EditUserModal";
+import GroupDetailApp from "metabase/admin/people/containers/GroupDetailApp";
+import GroupsListingApp from "metabase/admin/people/containers/GroupsListingApp";
+import { NewUserModal } from "metabase/admin/people/containers/NewUserModal";
+import PeopleListingApp from "metabase/admin/people/containers/PeopleListingApp";
+import UserActivationModal from "metabase/admin/people/containers/UserActivationModal";
+import UserPasswordResetModal from "metabase/admin/people/containers/UserPasswordResetModal";
+import UserSuccessModal from "metabase/admin/people/containers/UserSuccessModal";
+import { PerformanceApp } from "metabase/admin/performance/components/PerformanceApp";
+import getAdminPermissionsRoutes from "metabase/admin/permissions/routes";
+import { SettingsEditor } from "metabase/admin/settings/app/components/SettingsEditor";
+import { Help } from "metabase/admin/tasks/components/Help";
+import { Logs } from "metabase/admin/tasks/components/Logs";
+import { JobInfoApp } from "metabase/admin/tasks/containers/JobInfoApp";
+import { JobTriggersModal } from "metabase/admin/tasks/containers/JobTriggersModal";
 import {
-  PLUGIN_ADMIN_ROUTES,
-  PLUGIN_ADMIN_USER_MENU_ROUTES,
-  PLUGIN_ADMIN_TOOLS,
-} from "metabase/plugins";
-
-import { getSetting } from "metabase/selectors/settings";
+  ModelCacheRefreshJobModal,
+  ModelCacheRefreshJobs,
+} from "metabase/admin/tasks/containers/ModelCacheRefreshJobs";
+import { TaskModal } from "metabase/admin/tasks/containers/TaskModal";
+import { TasksApp } from "metabase/admin/tasks/containers/TasksApp";
+import TroubleshootingApp from "metabase/admin/tasks/containers/TroubleshootingApp";
+import Tools from "metabase/admin/tools/containers/Tools";
+import {
+  createAdminRedirect,
+  createAdminRouteGuard,
+} from "metabase/admin/utils";
+import CS from "metabase/css/core/index.css";
 import { withBackground } from "metabase/hoc/Background";
 import { ModalRoute } from "metabase/hoc/ModalRoute";
+import { Route } from "metabase/hoc/Title";
+import { MetabaseReduxContext } from "metabase/lib/redux";
 import {
-  createAdminRouteGuard,
-  createAdminRedirect,
-} from "metabase/admin/utils";
+  PLUGIN_ADMIN_ROUTES,
+  PLUGIN_ADMIN_TOOLS,
+  PLUGIN_ADMIN_TROUBLESHOOTING,
+  PLUGIN_ADMIN_USER_MENU_ROUTES,
+  PLUGIN_CACHING,
+} from "metabase/plugins";
+import { getSetting } from "metabase/selectors/settings";
 
+import { PerformanceTabId } from "./performance/types";
 import RedirectToAllowedSettings from "./settings/containers/RedirectToAllowedSettings";
-import AdminApp from "metabase/admin/app/components/AdminApp";
-import NewUserModal from "metabase/admin/people/containers/NewUserModal";
-import UserSuccessModal from "metabase/admin/people/containers/UserSuccessModal";
-import UserPasswordResetModal from "metabase/admin/people/containers/UserPasswordResetModal";
-import EditUserModal from "metabase/admin/people/containers/EditUserModal";
-import UserActivationModal from "metabase/admin/people/containers/UserActivationModal";
 
-// Settings
-import SettingsEditorApp from "metabase/admin/settings/containers/SettingsEditorApp";
-import PremiumEmbeddingLicensePage from "metabase/admin/settings/containers/PremiumEmbeddingLicensePage";
-
-//  DB Add / list
-import DatabaseListApp from "metabase/admin/databases/containers/DatabaseListApp";
-import DatabaseEditApp from "metabase/admin/databases/containers/DatabaseEditApp";
-
-// Metadata / Data model
-import DataModelApp from "metabase/admin/datamodel/containers/DataModelApp";
-import MetadataEditorApp from "metabase/admin/datamodel/containers/MetadataEditorApp";
-import MetricListApp from "metabase/admin/datamodel/containers/MetricListApp";
-import MetricApp from "metabase/admin/datamodel/containers/MetricApp";
-import SegmentListApp from "metabase/admin/datamodel/containers/SegmentListApp";
-import SegmentApp from "metabase/admin/datamodel/containers/SegmentApp";
-import RevisionHistoryApp from "metabase/admin/datamodel/containers/RevisionHistoryApp";
-import AdminPeopleApp from "metabase/admin/people/containers/AdminPeopleApp";
-import FieldApp from "metabase/admin/datamodel/containers/FieldApp";
-import TableSettingsApp from "metabase/admin/datamodel/containers/TableSettingsApp";
-
-import TroubleshootingApp from "metabase/admin/tasks/containers/TroubleshootingApp";
-import {
-  ModelCacheRefreshJobs,
-  ModelCacheRefreshJobModal,
-} from "metabase/admin/tasks/containers/ModelCacheRefreshJobs";
-import TasksApp from "metabase/admin/tasks/containers/TasksApp";
-import TaskModal from "metabase/admin/tasks/containers/TaskModal";
-import JobInfoApp from "metabase/admin/tasks/containers/JobInfoApp";
-import JobTriggersModal from "metabase/admin/tasks/containers/JobTriggersModal";
-import Logs from "metabase/admin/tasks/containers/Logs";
-import Help from "metabase/admin/tasks/containers/Help";
-
-// People
-import PeopleListingApp from "metabase/admin/people/containers/PeopleListingApp";
-import GroupsListingApp from "metabase/admin/people/containers/GroupsListingApp";
-import GroupDetailApp from "metabase/admin/people/containers/GroupDetailApp";
-
-// Permissions
-import getAdminPermissionsRoutes from "metabase/admin/permissions/routes";
-
-// Tools
-import Tools from "metabase/admin/tools/containers/Tools";
-
-const UserCanAccessTools = UserAuthWrapper({
-  predicate: isEnabled => isEnabled,
-  failureRedirectPath: "/admin",
-  authSelector: state => {
+const UserCanAccessTools = connectedReduxRedirect({
+  wrapperDisplayName: "UserCanAccessTools",
+  redirectPath: "/admin",
+  allowRedirectBack: false,
+  authenticatedSelector: state => {
     if (PLUGIN_ADMIN_TOOLS.EXTRA_ROUTES.length > 0) {
       return true;
     }
@@ -84,60 +72,37 @@ const UserCanAccessTools = UserAuthWrapper({
     const hasLoadedSettings = typeof isModelPersistenceEnabled === "boolean";
     return !hasLoadedSettings || isModelPersistenceEnabled;
   },
-  wrapperDisplayName: "UserCanAccessTools",
-  allowRedirectBack: false,
   redirectAction: routerActions.replace,
+  context: MetabaseReduxContext,
 });
 
 const getRoutes = (store, CanAccessSettings, IsAdmin) => (
   <Route
     path="/admin"
-    component={withBackground("bg-white")(CanAccessSettings)}
+    component={withBackground(CS.bgWhite)(CanAccessSettings)}
   >
     <Route title={t`Admin`} component={AdminApp}>
       <IndexRoute component={RedirectToAllowedSettings} />
-
       <Route
         path="databases"
         title={t`Databases`}
         component={createAdminRouteGuard("databases")}
       >
         <IndexRoute component={DatabaseListApp} />
-        <Route path="create" component={DatabaseEditApp} />
+        <Route path="create" component={IsAdmin}>
+          <IndexRoute component={DatabaseEditApp} />
+        </Route>
         <Route path=":databaseId" component={DatabaseEditApp} />
       </Route>
-
       <Route path="datamodel" component={createAdminRouteGuard("data-model")}>
-        <Route title={t`Data Model`} component={DataModelApp}>
-          <IndexRedirect to="database" />
-          <Route path="database" component={MetadataEditorApp} />
-          <Route path="database/:databaseId" component={MetadataEditorApp} />
-          <Route
-            path="database/:databaseId/:mode"
-            component={MetadataEditorApp}
-          />
-          <Route
-            path="database/:databaseId/:mode/:tableId"
-            component={MetadataEditorApp}
-          />
-          <Route
-            path="database/:databaseId/:mode/:tableId/settings"
-            component={TableSettingsApp}
-          />
-          <Route path="database/:databaseId/:mode/:tableId/:fieldId">
-            <IndexRedirect to="general" />
-            <Route path=":section" component={FieldApp} />
-          </Route>
-          <Route path="metrics" component={MetricListApp} />
-          <Route path="metric/create" component={MetricApp} />
-          <Route path="metric/:id" component={MetricApp} />
+        <Route title={t`Table Metadata`} component={DataModelApp}>
+          {getMetadataRoutes()}
           <Route path="segments" component={SegmentListApp} />
           <Route path="segment/create" component={SegmentApp} />
           <Route path="segment/:id" component={SegmentApp} />
-          <Route path=":entity/:id/revisions" component={RevisionHistoryApp} />
+          <Route path="segment/:id/revisions" component={RevisionHistoryApp} />
         </Route>
       </Route>
-
       {/* PEOPLE */}
       <Route path="people" component={createAdminRouteGuard("people")}>
         <Route title={t`People`} component={AdminPeopleApp}>
@@ -154,16 +119,18 @@ const getRoutes = (store, CanAccessSettings, IsAdmin) => (
           </Route>
 
           <Route path=":userId" component={PeopleListingApp}>
+            <IndexRedirect to="/admin/people" />
             <ModalRoute path="edit" modal={EditUserModal} />
             <ModalRoute path="success" modal={UserSuccessModal} />
             <ModalRoute path="reset" modal={UserPasswordResetModal} />
             <ModalRoute path="deactivate" modal={UserActivationModal} />
             <ModalRoute path="reactivate" modal={UserActivationModal} />
-            {PLUGIN_ADMIN_USER_MENU_ROUTES.map(getRoutes => getRoutes(store))}
+            {PLUGIN_ADMIN_USER_MENU_ROUTES.map((getRoutes, index) => (
+              <Fragment key={index}>{getRoutes(store)}</Fragment>
+            ))}
           </Route>
         </Route>
       </Route>
-
       {/* Troubleshooting */}
       <Route
         path="troubleshooting"
@@ -183,26 +150,39 @@ const getRoutes = (store, CanAccessSettings, IsAdmin) => (
             />
           </Route>
           <Route path="logs" component={Logs} />
+          {PLUGIN_ADMIN_TROUBLESHOOTING.EXTRA_ROUTES}
         </Route>
       </Route>
-
       {/* SETTINGS */}
       <Route path="settings" component={createAdminRouteGuard("settings")}>
         <IndexRoute component={createAdminRedirect("setup", "general")} />
         <Route title={t`Settings`}>
-          <Route
-            path="premium-embedding-license"
-            component={PremiumEmbeddingLicensePage}
-          />
-          <Route path="*" component={SettingsEditorApp} />
+          <Route path="*" component={SettingsEditor} />
         </Route>
       </Route>
-
       {/* PERMISSIONS */}
       <Route path="permissions" component={IsAdmin}>
         {getAdminPermissionsRoutes(store)}
       </Route>
-
+      {/* PERFORMANCE */}
+      <Route
+        path="performance"
+        component={createAdminRouteGuard("performance")}
+      >
+        <Route title={t`Performance`}>
+          <IndexRedirect to={PerformanceTabId.Databases} />
+          {PLUGIN_CACHING.getTabMetadata().map(({ name, key, tabId }) => (
+            <Route
+              component={routeProps => (
+                <PerformanceApp {...routeProps} tabId={tabId} />
+              )}
+              title={name}
+              path={tabId}
+              key={key}
+            />
+          ))}
+        </Route>
+      </Route>
       <Route
         path="tools"
         component={UserCanAccessTools(createAdminRouteGuard("tools"))}
@@ -219,11 +199,10 @@ const getRoutes = (store, CanAccessSettings, IsAdmin) => (
           {PLUGIN_ADMIN_TOOLS.EXTRA_ROUTES}
         </Route>
       </Route>
-
       {/* PLUGINS */}
-      <React.Fragment>
+      <Fragment>
         {PLUGIN_ADMIN_ROUTES.map(getRoutes => getRoutes(store))}
-      </React.Fragment>
+      </Fragment>
     </Route>
   </Route>
 );

@@ -1,30 +1,43 @@
-import React, { MouseEvent, useMemo } from "react";
+import { useMemo } from "react";
 import _ from "underscore";
-import Tooltip from "metabase/components/Tooltip";
-import DataPointTooltip from "./DataPointTooltip";
-import TimelineEventTooltip from "./TimelineEventTooltip";
-import {
+
+import Tooltip from "metabase/core/components/Tooltip";
+import { getEventTarget } from "metabase/lib/dom";
+import type {
   HoveredObject,
   HoveredTimelineEvent,
-  VisualizationSettings,
-} from "./types";
-import { getEventTarget } from "./utils";
+} from "metabase/visualizations/types";
+import type { VisualizationSettings } from "metabase-types/api";
+
+import KeyValuePairChartTooltip from "./KeyValuePairChartTooltip";
+import StackedDataTooltip from "./StackedDataTooltip";
+import TimelineEventTooltip from "./TimelineEventTooltip";
 
 export interface ChartTooltipProps {
   hovered?: HoveredObject;
   settings: VisualizationSettings;
 }
 
+export const ChartTooltipContent = ({
+  hovered,
+  settings,
+}: ChartTooltipProps) => {
+  if (!hovered) {
+    return null;
+  }
+  if (!_.isEmpty(hovered.timelineEvents)) {
+    return <TimelineEventTooltip hovered={hovered as HoveredTimelineEvent} />;
+  }
+
+  if (hovered.stackedTooltipModel) {
+    return <StackedDataTooltip {...hovered.stackedTooltipModel} />;
+  }
+
+  return <KeyValuePairChartTooltip hovered={hovered} settings={settings} />;
+};
+
 const ChartTooltip = ({ hovered, settings }: ChartTooltipProps) => {
-  const tooltip = useMemo(() => {
-    if (!hovered) {
-      return null;
-    }
-    if (!_.isEmpty(hovered.timelineEvents)) {
-      return <TimelineEventTooltip hovered={hovered as HoveredTimelineEvent} />;
-    }
-    return <DataPointTooltip hovered={hovered} settings={settings} />;
-  }, [hovered, settings]);
+  const tooltip = <ChartTooltipContent hovered={hovered} settings={settings} />;
 
   const isNotEmpty = useMemo(() => {
     if (!hovered) {
@@ -33,6 +46,7 @@ const ChartTooltip = ({ hovered, settings }: ChartTooltipProps) => {
     return (
       hovered.value !== undefined ||
       !_.isEmpty(hovered.timelineEvents) ||
+      !_.isEmpty(hovered.stackedTooltipModel) ||
       !_.isEmpty(hovered.data) ||
       !_.isEmpty(hovered.dimensions)
     );
@@ -42,21 +56,25 @@ const ChartTooltip = ({ hovered, settings }: ChartTooltipProps) => {
   const hasTargetElement =
     hovered?.element != null && document.body.contains(hovered.element);
   const isOpen = isNotEmpty && (hasTargetElement || hasTargetEvent);
+  const isPadded = hovered?.stackedTooltipModel == null;
 
   const target = hasTargetElement
     ? hovered?.element
     : hasTargetEvent
-    ? getEventTarget(hovered.event as MouseEvent)
-    : null;
+      ? getEventTarget(hovered.event)
+      : null;
 
   return target ? (
     <Tooltip
+      preventOverflow
       reference={target}
       isOpen={isOpen}
+      isPadded={isPadded}
       tooltip={tooltip}
       maxWidth="unset"
     />
   ) : null;
 };
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default ChartTooltip;

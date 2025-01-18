@@ -1,15 +1,12 @@
+---
+title: "Segment"
+summary: |
+  /api/segment endpoints.
+---
+
 # Segment
 
 /api/segment endpoints.
-
-  - [DELETE /api/segment/:id](#delete-apisegmentid)
-  - [GET /api/segment/](#get-apisegment)
-  - [GET /api/segment/:id](#get-apisegmentid)
-  - [GET /api/segment/:id/related](#get-apisegmentidrelated)
-  - [GET /api/segment/:id/revisions](#get-apisegmentidrevisions)
-  - [POST /api/segment/](#post-apisegment)
-  - [POST /api/segment/:id/revert](#post-apisegmentidrevert)
-  - [PUT /api/segment/:id](#put-apisegmentid)
 
 ## `DELETE /api/segment/:id`
 
@@ -17,9 +14,9 @@ Archive a Segment. (DEPRECATED -- Just pass updated value of `:archived` to the 
 
 ### PARAMS:
 
-*  **`id`** 
+-  **`id`** value must be an integer greater than zero.
 
-*  **`revision_message`** value must be a non-blank string.
+-  **`revision_message`** value must be a non-blank string.
 
 ## `GET /api/segment/`
 
@@ -31,7 +28,7 @@ Fetch `Segment` with ID.
 
 ### PARAMS:
 
-*  **`id`**
+-  **`id`** value must be an integer greater than zero.
 
 ## `GET /api/segment/:id/related`
 
@@ -39,7 +36,7 @@ Return related entities.
 
 ### PARAMS:
 
-*  **`id`**
+-  **`id`** value must be an integer greater than zero.
 
 ## `GET /api/segment/:id/revisions`
 
@@ -47,7 +44,7 @@ Fetch `Revisions` for `Segment` with ID.
 
 ### PARAMS:
 
-*  **`id`**
+-  **`id`** value must be an integer greater than zero.
 
 ## `POST /api/segment/`
 
@@ -55,13 +52,13 @@ Create a new `Segment`.
 
 ### PARAMS:
 
-*  **`name`** value must be a non-blank string.
+-  **`name`** value must be a non-blank string.
 
-*  **`description`** value may be nil, or if non-nil, value must be a string.
+-  **`description`** nullable string.
 
-*  **`table_id`** value must be an integer greater than zero.
+-  **`table_id`** value must be an integer greater than zero.
 
-*  **`definition`** value must be a map.
+-  **`definition`** Value must be a map.
 
 ## `POST /api/segment/:id/revert`
 
@@ -69,9 +66,9 @@ Revert a `Segement` to a prior `Revision`.
 
 ### PARAMS:
 
-*  **`id`** 
+-  **`id`** value must be an integer greater than zero.
 
-*  **`revision_id`** value must be an integer greater than zero.
+-  **`revision_id`** value must be an integer greater than zero.
 
 ## `PUT /api/segment/:id`
 
@@ -79,23 +76,23 @@ Update a `Segment` with ID.
 
 ### PARAMS:
 
-*  **`points_of_interest`** value may be nil, or if non-nil, value must be a string.
+-  **`points_of_interest`** nullable string.
 
-*  **`description`** value may be nil, or if non-nil, value must be a string.
+-  **`description`** nullable string.
 
-*  **`archived`** value may be nil, or if non-nil, value must be a boolean.
+-  **`archived`** nullable boolean.
 
-*  **`definition`** value may be nil, or if non-nil, value must be a map.
+-  **`definition`** nullable map.
 
-*  **`revision_message`** value must be a non-blank string.
+-  **`revision_message`** value must be a non-blank string.
 
-*  **`show_in_getting_started`** value may be nil, or if non-nil, value must be a boolean.
+-  **`show_in_getting_started`** nullable boolean.
 
-*  **`name`** value may be nil, or if non-nil, value must be a non-blank string.
+-  **`name`** nullable value must be a non-blank string.
 
-*  **`caveats`** value may be nil, or if non-nil, value must be a string.
+-  **`caveats`** nullable string.
 
-*  **`id`**
+-  **`id`** value must be an integer greater than zero.
 
 ---
 

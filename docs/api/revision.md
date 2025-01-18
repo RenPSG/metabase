@@ -1,7 +1,12 @@
+---
+title: "Revision"
+summary: |
+  API endpoints for Revision.
+---
+
 # Revision
 
-  - [GET /api/revision/](#get-apirevision)
-  - [POST /api/revision/revert](#post-apirevisionrevert)
+API endpoints for Revision.
 
 ## `GET /api/revision/`
 
@@ -9,9 +14,9 @@ Get revisions of an object.
 
 ### PARAMS:
 
-*  **`entity`** value must be one of: `card`, `dashboard`.
+-  **`entity`** enum of card, dashboard.
 
-*  **`id`** value must be an integer.
+-  **`id`** value must be an integer greater than zero.
 
 ## `POST /api/revision/revert`
 
@@ -19,11 +24,11 @@ Revert an object to a prior revision.
 
 ### PARAMS:
 
-*  **`entity`** value must be one of: `card`, `dashboard`.
+-  **`entity`** enum of card, dashboard.
 
-*  **`id`** value must be an integer.
+-  **`id`** value must be an integer greater than zero.
 
-*  **`revision_id`** value must be an integer.
+-  **`revision_id`** value must be an integer greater than zero.
 
 ---
 

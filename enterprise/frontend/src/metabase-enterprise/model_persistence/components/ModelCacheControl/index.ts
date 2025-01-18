@@ -1,1 +1,1 @@
-export { default } from "./ModelCacheControl";
+export * from "./ModelCacheControl";

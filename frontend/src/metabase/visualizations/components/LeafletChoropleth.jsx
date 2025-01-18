@@ -1,14 +1,12 @@
 /* eslint-disable react/prop-types */
-import React from "react";
-
-import { color } from "metabase/lib/colors";
-
-import CardRenderer from "./CardRenderer";
-
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
+import CS from "metabase/css/core/index.css";
+import { color } from "metabase/lib/colors";
 import { computeMinimalBounds } from "metabase/visualizations/lib/mapping";
+
+import CardRenderer from "./CardRenderer";
 
 const LeafletChoropleth = ({
   series = [],
@@ -22,9 +20,9 @@ const LeafletChoropleth = ({
   <CardRenderer
     card={{ display: "map" }}
     series={series}
-    className="spread"
+    className={CS.spread}
     renderer={(element, props) => {
-      element.className = "spread";
+      element.className = CS.spread;
       element.style.backgroundColor = "transparent";
 
       const map = L.map(element, {
@@ -83,24 +81,7 @@ const LeafletChoropleth = ({
         }),
       ]).addTo(map);
 
-      // // left and right duplicates so we can pan a bit
-      // L.featureGroup([
-      //   L.geoJson(geoJson, {
-      //     style,
-      //     onEachFeature,
-      //     coordsToLatLng: ([longitude, latitude]) =>
-      //       L.latLng(latitude, longitude - 360),
-      //   }),
-      //   L.geoJson(geoJson, {
-      //     style,
-      //     onEachFeature,
-      //     coordsToLatLng: ([longitude, latitude]) =>
-      //       L.latLng(latitude, longitude + 360),
-      //   }),
-      // ]).addTo(map);
-
       map.fitBounds(minimalBounds);
-      map.panTo([0, 0], { animate: false });
 
       return () => {
         map.remove();

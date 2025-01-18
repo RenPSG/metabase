@@ -1,48 +1,65 @@
+---
+title: "Sandbox GTAP"
+summary: |
+  `/api/mt/gtap` endpoints, for CRUD operations and the like on GTAPs (Group Table Access Policies).
+---
+
 # Sandbox GTAP
 
 `/api/mt/gtap` endpoints, for CRUD operations and the like on GTAPs (Group Table Access Policies).
 
-  - [DELETE /api/ee/sandbox/gtap/:id](#delete-apieesandboxgtapid)
-  - [GET /api/ee/sandbox/gtap/](#get-apieesandboxgtap)
-  - [GET /api/ee/sandbox/gtap/:id](#get-apieesandboxgtapid)
-  - [POST /api/ee/sandbox/gtap/](#post-apieesandboxgtap)
-  - [PUT /api/ee/sandbox/gtap/:id](#put-apieesandboxgtapid)
-
-## `DELETE /api/ee/sandbox/gtap/:id`
+## `DELETE /api/mt/gtap/:id`
 
 Delete a GTAP entry.
 
 ### PARAMS:
 
-*  **`id`**
+-  **`id`** value must be an integer greater than zero.
 
-## `GET /api/ee/sandbox/gtap/`
+## `GET /api/mt/gtap/`
 
-Fetch a list of all the GTAPs currently in use.
+Fetch a list of all GTAPs currently in use, or a single GTAP if both `group_id` and `table_id` are provided.
 
-## `GET /api/ee/sandbox/gtap/:id`
+### PARAMS:
+
+-  **`group_id`** nullable value must be an integer greater than zero.
+
+-  **`table_id`** nullable value must be an integer greater than zero.
+
+## `GET /api/mt/gtap/:id`
 
 Fetch GTAP by `id`.
 
 ### PARAMS:
 
-*  **`id`**
+-  **`id`** value must be an integer greater than zero.
 
-## `POST /api/ee/sandbox/gtap/`
+## `POST /api/mt/gtap/`
 
 Create a new GTAP.
 
 ### PARAMS:
 
-*  **`table_id`** value must be an integer greater than zero.
+-  **`table_id`** value must be an integer greater than zero.
 
-*  **`card_id`** value may be nil, or if non-nil, value must be an integer greater than zero.
+-  **`card_id`** nullable value must be an integer greater than zero.
 
-*  **`group_id`** value must be an integer greater than zero.
+-  **`group_id`** value must be an integer greater than zero.
 
-*  **`attribute_remappings`**
+-  **`attribute_remappings`**
 
-## `PUT /api/ee/sandbox/gtap/:id`
+## `POST /api/mt/gtap/validate`
+
+Validate a sandbox which may not have yet been saved. This runs the same validation that is performed when the
+  sandbox is saved, but doesn't actually save the sandbox.
+
+### PARAMS:
+
+-  **`table_id`** value must be an integer greater than zero.
+
+-  **`card_id`** nullable value must be an integer greater than zero.
+
+## `PUT /api/mt/gtap/:id`
 
 Update a GTAP entry. The only things you're allowed to update for a GTAP are the Card being used (`card_id`) or the
   paramter mappings; changing `table_id` or `group_id` would effectively be deleting this entry and creating a new
@@ -50,9 +67,9 @@ Update a GTAP entry. The only things you're allowed to update for a GTAP are the
 
 ### PARAMS:
 
-*  **`id`** 
+-  **`id`** value must be an integer greater than zero.
 
-*  **`card_id`** value may be nil, or if non-nil, value must be an integer greater than zero.
+-  **`card_id`** nullable value must be an integer greater than zero.
 
 ---
 

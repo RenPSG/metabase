@@ -1,42 +1,45 @@
 import styled from "@emotion/styled";
-import { color } from "metabase/lib/colors";
-import Icon from "metabase/components/Icon";
 
-export interface TabProps {
+import { focusOutlineStyle } from "metabase/core/style/input";
+import { alpha, color } from "metabase/lib/colors";
+import { space } from "metabase/styled-components/theme";
+import { Icon } from "metabase/ui";
+
+interface TabProps {
   isSelected?: boolean;
 }
 
 export const TabRoot = styled.button<TabProps>`
-  display: inline-flex;
-  align-items: center;
+  display: flex;
+  align-items: end;
+  width: 100%;
+  flex: 1;
+  text-align: left;
   color: ${props => (props.isSelected ? color("brand") : color("text-dark"))};
+  background-color: ${props =>
+    props.isSelected ? alpha("brand", 0.1) : "transparent"};
   cursor: pointer;
-  padding-bottom: 0.75rem;
-  border-bottom: 0.125rem solid
-    ${props => (props.isSelected ? color("brand") : "transparent")};
+  margin-bottom: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-right: ${space(1)};
+  border-radius: ${space(0)};
 
   &:hover {
-    color: ${color("brand")};
-    border-color: ${color("brand")};
+    color: var(--mb-color-brand);
   }
 
-  &:focus {
-    outline: 2px solid ${color("focus")};
-  }
-
-  &:focus:not(:focus-visible) {
-    outline: none;
-  }
+  ${focusOutlineStyle("brand")};
 `;
 
 export const TabIcon = styled(Icon)`
   width: 1rem;
   height: 1rem;
-  margin-right: 0.25rem;
+  margin-right: 0.5rem;
 `;
 
-export const TabLabel = styled.span`
-  font-size: 1rem;
-  line-height: 1rem;
+export const TabLabel = styled.div`
+  width: 100%;
   font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `;

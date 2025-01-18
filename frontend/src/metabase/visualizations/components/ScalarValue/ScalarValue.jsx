@@ -2,17 +2,28 @@
  * Shared component for Scalar and SmartScalar to make sure our number presentation stays in sync
  */
 /* eslint-disable react/prop-types */
-import React from "react";
 import cx from "classnames";
+import { useMemo } from "react";
+import { t } from "ttag";
 
-import Icon from "metabase/components/Icon";
-import Tooltip from "metabase/components/Tooltip";
-import Ellipsified from "metabase/core/components/Ellipsified";
+import { Ellipsified } from "metabase/core/components/Ellipsified";
+import Markdown from "metabase/core/components/Markdown";
+import Tooltip from "metabase/core/components/Tooltip";
+import DashboardS from "metabase/css/dashboard.module.css";
+import QueryBuilderS from "metabase/css/query_builder.module.css";
+import EmbedFrameS from "metabase/public/components/EmbedFrame/EmbedFrame.module.css";
+import { useMantineTheme } from "metabase/ui";
+
 import {
+  ScalarDescriptionContainer,
+  ScalarDescriptionIcon,
+  ScalarDescriptionPlaceholder,
   ScalarRoot,
+  ScalarTitleContainer,
+  ScalarTitleContent,
   ScalarValueWrapper,
-  ScalarTitleRoot,
 } from "./ScalarValue.styled";
+import { findSize, getMaxFontSize } from "./utils";
 
 export const ScalarWrapper = ({ children }) => (
   <ScalarRoot>{children}</ScalarRoot>
@@ -20,61 +31,88 @@ export const ScalarWrapper = ({ children }) => (
 
 const ScalarValue = ({
   value,
-  isDashboard,
-  gridSize,
-  minGridSize,
-  width,
   height,
+  width,
+  gridSize,
   totalNumGridCols,
-}) => (
-  <ScalarValueWrapper
-    className="ScalarValue"
-    isDashboard={isDashboard}
-    gridSize={gridSize}
-    minGridSize={minGridSize}
-    width={width}
-    height={height}
-    totalNumGridCols={totalNumGridCols}
-  >
-    {value}
-  </ScalarValueWrapper>
-);
+  fontFamily,
+}) => {
+  const {
+    other: { number: numberTheme },
+  } = useMantineTheme();
 
-const ICON_WIDTH = 24;
+  const fontSize = useMemo(() => {
+    if (numberTheme?.value?.fontSize) {
+      return numberTheme.value?.fontSize;
+    }
 
-export const ScalarTitle = ({ title, description, onClick }) => (
-  <ScalarTitleRoot>
+    return findSize({
+      text: value,
+      targetHeight: height,
+      targetWidth: width,
+      fontFamily: fontFamily ?? "Lato",
+      fontWeight: 700,
+      unit: "rem",
+      step: 0.2,
+      min: 1,
+      max: gridSize ? getMaxFontSize(gridSize.width, totalNumGridCols) : 4,
+    });
+  }, [
+    fontFamily,
+    gridSize,
+    height,
+    totalNumGridCols,
+    value,
+    width,
+    numberTheme?.value?.fontSize,
+  ]);
+
+  return (
+    <ScalarValueWrapper
+      className={cx(DashboardS.ScalarValue, QueryBuilderS.ScalarValue)}
+      fontSize={fontSize}
+      lineHeight={numberTheme?.value?.lineHeight}
+      data-testid="scalar-value"
+    >
+      {value ?? t`null`}
+    </ScalarValueWrapper>
+  );
+};
+
+export const ScalarTitle = ({ lines = 2, title, description, onClick }) => (
+  <ScalarTitleContainer data-testid="scalar-title" lines={lines}>
     {/*
       This is a hacky spacer so that the h3 is centered correctly.
       It needs match the width of the tooltip icon on the other side.
      */}
-    {description && description.length > 0 && (
-      <div style={{ width: ICON_WIDTH }} />
-    )}
-    <h3
-      onClick={onClick}
+    {description && description.length > 0 && <ScalarDescriptionPlaceholder />}
+    <ScalarTitleContent
       className={cx(
-        "Scalar-title overflow-hidden text-centered fullscreen-normal-text fullscreen-night-text text-brand-hover",
-        {
-          "cursor-pointer": !!onClick,
-        },
+        DashboardS.fullscreenNormalText,
+        DashboardS.fullscreenNightText,
+        EmbedFrameS.fullscreenNightText,
       )}
+      onClick={onClick}
     >
-      <Ellipsified tooltip={title} lines={2} placement="bottom">
+      <Ellipsified tooltip={title} lines={lines} placement="bottom">
         {title}
       </Ellipsified>
-    </h3>
+    </ScalarTitleContent>
     {description && description.length > 0 && (
-      <div
-        className="hover-child cursor-pointer pl1 text-brand-hover"
-        style={{ marginTop: 5, width: ICON_WIDTH }}
-      >
-        <Tooltip tooltip={description} maxWidth="22em">
-          <Icon name="info_outline" />
+      <ScalarDescriptionContainer data-testid="scalar-description">
+        <Tooltip
+          tooltip={
+            <Markdown dark disallowHeading unstyleLinks>
+              {description}
+            </Markdown>
+          }
+          maxWidth="22em"
+        >
+          <ScalarDescriptionIcon name="info_filled" />
         </Tooltip>
-      </div>
+      </ScalarDescriptionContainer>
     )}
-  </ScalarTitleRoot>
+  </ScalarTitleContainer>
 );
 
 export default ScalarValue;

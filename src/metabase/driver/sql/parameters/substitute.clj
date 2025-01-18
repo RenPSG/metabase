@@ -1,12 +1,14 @@
 (ns metabase.driver.sql.parameters.substitute
-  (:require [clojure.string :as str]
-            [clojure.tools.logging :as log]
-            [metabase.driver :as driver]
-            [metabase.driver.common.parameters :as params]
-            [metabase.driver.sql.parameters.substitution :as sql.params.substitution]
-            [metabase.query-processor.error-type :as qp.error-type]
-            [metabase.util :as u]
-            [metabase.util.i18n :refer [tru]]))
+  (:require
+   [clojure.string :as str]
+   [metabase.driver :as driver]
+   [metabase.driver.common.parameters :as params]
+   [metabase.driver.sql.parameters.substitution
+    :as sql.params.substitution]
+   [metabase.query-processor.error-type :as qp.error-type]
+   [metabase.util :as u]
+   [metabase.util.i18n :refer [tru]]
+   [metabase.util.log :as log]))
 
 (defn- substitute-field-filter [[sql args missing] in-optional? k {:keys [_field value], :as v}]
   (if (and (= params/no-value value) in-optional?)
@@ -23,8 +25,8 @@
     [(str sql replacement-snippet) (concat args prepared-statement-args) missing]))
 
 (defn- substitute-native-query-snippet [[sql args missing] v]
-   (let [{:keys [replacement-snippet]} (sql.params.substitution/->replacement-snippet-info driver/*driver* v)]
-     [(str sql replacement-snippet) args missing]))
+  (let [{:keys [replacement-snippet]} (sql.params.substitution/->replacement-snippet-info driver/*driver* v)]
+    [(str sql replacement-snippet) args missing]))
 
 (defn- substitute-param [param->value [sql args missing] in-optional? {:keys [k]}]
   (if-not (contains? param->value k)
@@ -87,13 +89,13 @@
                              (substitute* param->value parsed-query false)
                              (catch Throwable e
                                (throw (ex-info (tru "Unable to substitute parameters: {0}" (ex-message e))
-                                        {:type         (or (:type (ex-data e)) qp.error-type/qp)
-                                         :params       param->value
-                                         :parsed-query parsed-query}
-                                        e))))]
+                                               {:type         (or (:type (ex-data e)) qp.error-type/qp)
+                                                :params       param->value
+                                                :parsed-query parsed-query}
+                                               e))))]
     (log/tracef "=>%s\n%s" sql (pr-str args))
     (when (seq missing)
       (throw (ex-info (tru "Cannot run the query: missing required parameters: {0}" (set missing))
-               {:type    qp.error-type/missing-required-parameter
-                :missing missing})))
+                      {:type    qp.error-type/missing-required-parameter
+                       :missing missing})))
     [(str/trim sql) args]))

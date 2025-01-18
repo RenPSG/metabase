@@ -1,7 +1,9 @@
 /* eslint-disable react/prop-types */
-import React, { Component } from "react";
+import { Component } from "react";
 
-import ChartSettingColorPicker from "./ChartSettingColorPicker";
+import CS from "metabase/css/core/index.css";
+
+import { ChartSettingColorPicker } from "./ChartSettingColorPicker";
 
 export default class ChartSettingColorsPicker extends Component {
   render() {
@@ -10,6 +12,7 @@ export default class ChartSettingColorsPicker extends Component {
       <div>
         {seriesValues.map((key, index) => (
           <ChartSettingColorPicker
+            className={CS.mb1}
             key={index}
             onChange={color =>
               onChange({

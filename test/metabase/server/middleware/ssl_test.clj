@@ -1,13 +1,14 @@
 (ns metabase.server.middleware.ssl-test
-  (:require [clojure.test :refer :all]
-            [metabase.server.middleware.ssl :as mw.ssl]
-            [metabase.test.util :as tu]
-            [ring.mock.request :as ring.mock]
-            [ring.util.response :as response]))
+  (:require
+   [clojure.test :refer :all]
+   [metabase.server.middleware.ssl :as mw.ssl]
+   [metabase.test.util :as tu]
+   [ring.mock.request :as ring.mock]
+   [ring.util.response :as response]))
 
 (defn- handler [request]
   ((mw.ssl/redirect-to-https-middleware
-    (fn [request respond _] (respond (response/response ""))))
+    (fn [_request respond _raise] (respond (response/response ""))))
    request
    identity
    (fn [e] (throw e))))
@@ -34,13 +35,13 @@
 (deftest test-do-not-redirect-healthcheck
   (testing "does not redirect when disabled"
     (tu/with-temporary-setting-values [redirect-all-requests-to-https false]
-     (let [response (handler (ring.mock/request :get "/api/health"))]
-       (is (= 200 (:status response))))))
+      (let [response (handler (ring.mock/request :get "/api/health"))]
+        (is (= 200 (:status response))))))
   (testing "does not redirect when enabled"
     (tu/with-temporary-setting-values [site-url "https://localhost"
                                        redirect-all-requests-to-https true]
-     (let [response (handler (ring.mock/request :get "/api/health"))]
-       (is (= 200 (:status response)))))))
+      (let [response (handler (ring.mock/request :get "/api/health"))]
+        (is (= 200 (:status response)))))))
 
 (deftest test-do-not-redirect-loadbalancer-sessions
   (testing "does not redirect"
@@ -68,8 +69,8 @@
   (testing "does not redirect when disabled"
     (tu/with-temporary-setting-values [site-url "https://localhost"
                                        redirect-all-requests-to-https false]
-     (let [response (handler (ring.mock/request :get "https://localhost/foo"))]
-       (is (= 200 (:status response))))))
+      (let [response (handler (ring.mock/request :get "https://localhost/foo"))]
+        (is (= 200 (:status response))))))
   (testing "does not redirect when enabled"
     (tu/with-temporary-setting-values [site-url "https://localhost"
                                        redirect-all-requests-to-https true]

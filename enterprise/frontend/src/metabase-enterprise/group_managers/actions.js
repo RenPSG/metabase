@@ -1,12 +1,14 @@
 import { push } from "react-router-redux";
-import { createThunkAction } from "metabase/lib/redux";
+
+import { getAdminPaths } from "metabase/admin/app/selectors";
 import {
   deleteMembership,
   updateMembership,
 } from "metabase/admin/people/people";
-import { getAdminPaths } from "metabase/admin/app/selectors";
-import { refreshCurrentUser } from "metabase/redux/user";
 import Groups from "metabase/entities/groups";
+import { createThunkAction } from "metabase/lib/redux";
+import { refreshCurrentUser } from "metabase/redux/user";
+
 import {
   getRevokeManagerGroupsRedirect,
   getRevokeManagerPeopleRedirect,
@@ -17,24 +19,22 @@ export const CONFIRM_DELETE_MEMBERSHIP =
   "metabase-enterprise/group_managers/CONFIRM_DELETE_MEMBERSHIP";
 export const confirmDeleteMembership = createThunkAction(
   CONFIRM_DELETE_MEMBERSHIP,
-  (membershipId, currentUserMemberships, view) => async (
-    dispatch,
-    getState,
-  ) => {
-    await dispatch(deleteMembership(membershipId));
-    await dispatch(refreshCurrentUser());
+  (membershipId, currentUserMemberships, view) =>
+    async (dispatch, getState) => {
+      await dispatch(deleteMembership(membershipId));
+      await dispatch(refreshCurrentUser());
 
-    const adminPaths = getAdminPaths(getState());
+      const adminPaths = getAdminPaths(getState());
 
-    const redirectUrl =
-      view === "people"
-        ? getRevokeManagerPeopleRedirect(currentUserMemberships, adminPaths)
-        : getRevokeManagerGroupsRedirect(currentUserMemberships, adminPaths);
+      const redirectUrl =
+        view === "people"
+          ? getRevokeManagerPeopleRedirect(currentUserMemberships, adminPaths)
+          : getRevokeManagerGroupsRedirect(currentUserMemberships, adminPaths);
 
-    if (redirectUrl) {
-      await dispatch(push(redirectUrl));
-    }
-  },
+      if (redirectUrl) {
+        await dispatch(push(redirectUrl));
+      }
+    },
 );
 
 export const CONFIRM_UPDATE_MEMBERSHIP =

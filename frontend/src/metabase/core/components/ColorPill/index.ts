@@ -1,1 +1,2 @@
-export { default } from "./ColorPill";
+export { ColorPill } from "./ColorPill";
+export type { PillSize } from "./types";

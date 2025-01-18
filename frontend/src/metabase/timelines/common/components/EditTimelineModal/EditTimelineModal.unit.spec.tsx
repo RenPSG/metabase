@@ -1,25 +1,24 @@
-import React, { FormHTMLAttributes } from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
 import { createMockTimeline } from "metabase-types/api/mocks";
-import EditTimelineModal, { EditTimelineModalProps } from "./EditTimelineModal";
 
-const FormMock = (props: FormHTMLAttributes<HTMLFormElement>) => (
-  <form {...props}>
-    <button>Update</button>
-  </form>
-);
-
-jest.mock("metabase/containers/Form", () => FormMock);
+import type { EditTimelineModalProps } from "./EditTimelineModal";
+import EditTimelineModal from "./EditTimelineModal";
 
 describe("EditTimelineModal", () => {
-  it("should submit modal", () => {
+  it("should submit modal", async () => {
     const props = getProps();
+    const name = "Another timeline";
 
     render(<EditTimelineModal {...props} />);
-    userEvent.click(screen.getByText("Update"));
+    await userEvent.clear(screen.getByLabelText("Name"));
+    await userEvent.type(screen.getByLabelText("Name"), name);
+    await userEvent.click(screen.getByText("Update"));
 
-    expect(props.onSubmit).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(props.onSubmit).toHaveBeenCalledWith({ ...props.timeline, name });
+    });
   });
 });
 

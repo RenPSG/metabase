@@ -1,11 +1,13 @@
 (ns metabase.api.common.validation
-  (:require [clojure.string :as str]
-            [metabase.api.common :as api]
-            [metabase.plugins.classloader :as classloader]
-            [metabase.public-settings :as public-settings]
-            [metabase.public-settings.premium-features :as premium-features]
-            [metabase.util :as u]
-            [metabase.util.i18n :refer [tru]]))
+  (:require
+   [clojure.string :as str]
+   [metabase.api.common :as api]
+   [metabase.config :as config]
+   [metabase.embed.settings :as embed.settings]
+   [metabase.plugins.classloader :as classloader]
+   [metabase.premium-features.core :as premium-features]
+   [metabase.public-settings :as public-settings]
+   [metabase.util.i18n :refer [tru]]))
 
 ;; TODO: figure out what other functions to move here from metabase.api.common
 
@@ -18,7 +20,7 @@
 (defn check-embedding-enabled
   "Is embedding of Cards or Objects (secured access via `/api/embed` endpoints with a signed JWT enabled?"
   []
-  (api/check (public-settings/enable-embedding)
+  (api/check (embed.settings/enable-embedding-static)
              [400 (tru "Embedding is not enabled.")]))
 
 (defn check-has-application-permission
@@ -48,10 +50,10 @@
    (check-group-manager true))
 
   ([require-superuser?]
-  (if (premium-features/enable-advanced-permissions?)
-    (api/check-403 (or api/*is-superuser?* api/*is-group-manager?*))
-    (when require-superuser?
-      (api/check-superuser)))))
+   (if (premium-features/enable-advanced-permissions?)
+     (api/check-403 (or api/*is-superuser?* api/*is-group-manager?*))
+     (when require-superuser?
+       (api/check-superuser)))))
 
 (defn check-manager-of-group
   "If `advanced-permissions` is enabled, check is `*current-user*` is manager of `group-or-id`.
@@ -60,8 +62,8 @@
    (check-manager-of-group group-or-id true))
 
   ([group-or-id require-superuser?]
-   (u/ignore-exceptions
-    (classloader/require 'metabase-enterprise.advanced-permissions.common))
+   (when config/ee-available?
+     (classloader/require 'metabase-enterprise.advanced-permissions.common))
    (if-let [f (and (premium-features/enable-advanced-permissions?)
                    (resolve 'metabase-enterprise.advanced-permissions.common/current-user-is-manager-of-group?))]
      (api/check-403 (or api/*is-superuser?* (f group-or-id)))

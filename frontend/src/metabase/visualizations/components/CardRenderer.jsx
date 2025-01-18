@@ -1,21 +1,10 @@
 /* eslint-disable react/prop-types */
-import React, { Component } from "react";
 import PropTypes from "prop-types";
+import { Component } from "react";
 import ReactDOM from "react-dom";
-import _ from "underscore";
 
 import ExplicitSize from "metabase/components/ExplicitSize";
-import * as MetabaseAnalytics from "metabase/lib/analytics";
-import { startTimer } from "metabase/lib/performance";
-
 import { isSameSeries } from "metabase/visualizations/lib/utils";
-
-// We track this as part of the render loop.
-// It's throttled to prevent pounding GA on every prop update.
-const trackEventThrottled = _.throttle(
-  MetabaseAnalytics.trackStructEvent,
-  10000,
-);
 
 class CardRenderer extends Component {
   static propTypes = {
@@ -57,7 +46,7 @@ class CardRenderer extends Component {
   }
 
   renderChart() {
-    const { width, height, isDashboard, isEditing, isSettings } = this.props;
+    const { width, height } = this.props;
     if (width == null || height == null) {
       return;
     }
@@ -76,23 +65,8 @@ class CardRenderer extends Component {
     const element = document.createElement("div");
     parent.appendChild(element);
 
-    if (isDashboard && isEditing && !isSettings) {
-      // If this card is a dashboard that's currently being edited, we cover the
-      // content to prevent interaction with the chart. The !isSettings
-      // exception is to handle modals that appear above a dashboard.
-      const mouseBlocker = document.createElement("div");
-      mouseBlocker.classList.add("spread");
-      mouseBlocker.style.setProperty("pointer-events", "all");
-      parent.appendChild(mouseBlocker);
-    }
-
     try {
-      const t = startTimer();
       this._deregister = this.props.renderer(element, this.props);
-      t(duration => {
-        const { display } = this.props.card;
-        trackEventThrottled("Visualization", "Render Card", display, duration);
-      });
     } catch (err) {
       console.error(err);
       this.props.onRenderError(err.message || err);
@@ -106,5 +80,6 @@ class CardRenderer extends Component {
 
 export default ExplicitSize({
   wrapped: true,
-  refreshMode: props => (props.isDashboard ? "debounce" : "throttle"),
+  // Avoid using debounce when isDashboard=true because there should not be any initial delay when rendering cards
+  refreshMode: props => (props.isDashboard ? "debounceLeading" : "throttle"),
 })(CardRenderer);

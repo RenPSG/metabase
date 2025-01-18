@@ -1,7 +1,11 @@
-import React, { forwardRef, Ref, useCallback } from "react";
+import type { Moment } from "moment-timezone"; // eslint-disable-line no-restricted-imports -- deprecated usage
+import moment from "moment-timezone"; // eslint-disable-line no-restricted-imports -- deprecated usage
+import type { Ref } from "react";
+import { forwardRef, useCallback } from "react";
 import { t } from "ttag";
-import moment, { Moment } from "moment";
-import Tooltip from "metabase/components/Tooltip";
+
+import Tooltip from "metabase/core/components/Tooltip";
+
 import {
   InputClearButton,
   InputClearIcon,
@@ -12,18 +16,32 @@ import {
   InputRoot,
 } from "./TimeInput.styled";
 
+const TIME_FORMAT_12 = "h:mm A";
+
 export interface TimeInputProps {
   value: Moment;
-  is24HourMode?: boolean;
+  timeFormat?: string;
   autoFocus?: boolean;
+  hasClearButton?: boolean;
   onChange?: (value: Moment) => void;
   onClear?: (value: Moment) => void;
 }
 
+/**
+ * @deprecated: use TimeInput from "metabase/ui"
+ */
 const TimeInput = forwardRef(function TimeInput(
-  { value, is24HourMode, autoFocus, onChange, onClear }: TimeInputProps,
+  {
+    value,
+    timeFormat = TIME_FORMAT_12,
+    autoFocus,
+    hasClearButton = true,
+    onChange,
+    onClear,
+  }: TimeInputProps,
   ref: Ref<HTMLDivElement>,
 ): JSX.Element {
+  const is24HourMode = timeFormat === "HH:mm";
   const hoursText = value.format(is24HourMode ? "HH" : "hh");
   const minutesText = value.format("mm");
   const isAm = value.hours() < 12;
@@ -32,7 +50,7 @@ const TimeInput = forwardRef(function TimeInput(
   const pmText = moment.localeData().meridiem(12, 0, false);
 
   const handleHoursChange = useCallback(
-    (hours = 0) => {
+    (hours: number = 0) => {
       const newValue = value.clone();
       if (is24HourMode) {
         newValue.hours(hours % 24);
@@ -45,7 +63,7 @@ const TimeInput = forwardRef(function TimeInput(
   );
 
   const handleMinutesChange = useCallback(
-    (minutes = 0) => {
+    (minutes: number = 0) => {
       const newValue = value.clone();
       newValue.minutes(minutes % 60);
       onChange?.(newValue);
@@ -104,16 +122,19 @@ const TimeInput = forwardRef(function TimeInput(
           </InputMeridiemButton>
         </InputMeridiemContainer>
       )}
-      <Tooltip tooltip={t`Remove time`}>
-        <InputClearButton
-          aria-label={t`Remove time`}
-          onClick={handleClearClick}
-        >
-          <InputClearIcon name="close" />
-        </InputClearButton>
-      </Tooltip>
+      {hasClearButton && (
+        <Tooltip tooltip={t`Remove time`}>
+          <InputClearButton
+            aria-label={t`Remove time`}
+            onClick={handleClearClick}
+          >
+            <InputClearIcon name="close" />
+          </InputClearButton>
+        </Tooltip>
+      )}
     </InputRoot>
   );
 });
 
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default TimeInput;

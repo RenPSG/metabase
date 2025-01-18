@@ -1,21 +1,23 @@
 (ns metabase.integrations.common-test
-  (:require [clojure.test :refer :all]
-            [clojure.tools.logging :as log]
-            [metabase.integrations.common :as integrations.common]
-            [metabase.models.permissions-group :as perms-group :refer [PermissionsGroup]]
-            [metabase.models.permissions-group-membership :as perms-group-membership :refer [PermissionsGroupMembership]]
-            [metabase.test :as mt :refer [with-user-in-groups]]
-            [metabase.test.fixtures :as fixtures]
-            [metabase.util :as u]
-            [toucan.db :as db]))
+  (:require
+   [clojure.test :refer :all]
+   ^{:clj-kondo/ignore [:discouraged-namespace]}
+   [clojure.tools.logging]
+   [metabase.integrations.common :as integrations.common]
+   [metabase.models.permissions-group :as perms-group]
+   [metabase.models.permissions-group-membership :as perms-group-membership]
+   [metabase.test :as mt :refer [with-user-in-groups]]
+   [metabase.test.fixtures :as fixtures]
+   [metabase.util :as u]
+   [toucan2.core :as t2]))
 
 (use-fixtures :once (fixtures/initialize :db))
 
 (defn- group-memberships
   "Return set of names of PermissionsGroups `user` currently belongs to."
   [user]
-  (when-let [group-ids (seq (db/select-field :group_id PermissionsGroupMembership :user_id (u/the-id user)))]
-    (db/select-field :name PermissionsGroup :id [:in group-ids])))
+  (when-let [group-ids (seq (t2/select-fn-set :group_id :model/PermissionsGroupMembership :user_id (u/the-id user)))]
+    (t2/select-fn-set :name :model/PermissionsGroup :id [:in group-ids])))
 
 (deftest sync-groups-test
   (testing "does syncing group memberships leave existing memberships in place if nothing has changed?"
@@ -28,7 +30,7 @@
   (testing "the actual `PermissionsGroupMembership` object should not have been replaced"
     (with-user-in-groups [group {:name (str ::group)}
                           user  [group]]
-      (let [membership-id          #(db/select-one-id PermissionsGroupMembership
+      (let [membership-id          #(t2/select-one-pk :model/PermissionsGroupMembership
                                                       :group_id (u/the-id group)
                                                       :user_id  (u/the-id user))
             original-membership-id (membership-id)]
@@ -77,11 +79,12 @@
              (group-memberships user)))))
 
   (testing "if we attempt to add a user to a group that doesn't exist, does the group sync complete for the other groups?"
-    (with-user-in-groups [group {:name (str ::group)}
-                          user    []]
-      (integrations.common/sync-group-memberships! user #{Integer/MAX_VALUE group} #{Integer/MAX_VALUE group})
-      (is (= #{"All Users" ":metabase.integrations.common-test/group"}
-             (group-memberships user)))))
+    (mt/test-helpers-set-global-values!
+      (with-user-in-groups [group {:name (str ::group)}
+                            user    []]
+        (integrations.common/sync-group-memberships! user #{Integer/MAX_VALUE group} #{Integer/MAX_VALUE group})
+        (is (= #{"All Users" ":metabase.integrations.common-test/group"}
+               (group-memberships user))))))
 
   (mt/with-test-user :crowberto
     (testing "Admin should be synced just like a other groups group."
@@ -101,19 +104,28 @@
         (with-user-in-groups [user []]
           (integrations.common/sync-group-memberships! user #{(perms-group/admin)} #{(perms-group/admin)})
           (is (= #{"All Users" "Administrators"}
+                 (group-memberships user)))))
+
+      (testing "unmapped admin group is ignored even if other groups are added (#29718)"
+        (with-user-in-groups [group {:name (str ::group)}
+                              user  [(perms-group/admin)]]
+          (integrations.common/sync-group-memberships! user #{group} #{group})
+          (is (= #{"All Users" "Administrators" ":metabase.integrations.common-test/group"}
                  (group-memberships user)))))))
 
   (testing "Make sure the delete last admin exception is catched"
     (mt/with-log-level :warn
       (with-user-in-groups [user [(perms-group/admin)]]
         (let [log-warn-count (atom #{})]
-          (with-redefs [db/delete! (fn [model & _args]
-                                     (when (= model PermissionsGroupMembership)
-                                       (throw (ex-info (str perms-group-membership/fail-to-remove-last-admin-msg)
-                                                       {:status-code 400}))))
-                        log/log*   (fn [_logger level _throwable msg]
-                                     (when (:= level :warn)
-                                       (swap! log-warn-count conj msg)))]
+          (with-redefs [t2/delete!
+                        (fn [model & _args]
+                          (when (= model :model/PermissionsGroupMembership)
+                            (throw (ex-info (str perms-group-membership/fail-to-remove-last-admin-msg)
+                                            {:status-code 400}))))
+                        clojure.tools.logging/log*
+                        (fn [_logger level _throwable msg]
+                          (when (:= level :warn)
+                            (swap! log-warn-count conj msg)))]
             ;; make sure sync run without throwing exception
             (integrations.common/sync-group-memberships! user #{} #{(perms-group/admin)})
             ;; make sure we log a msg for that

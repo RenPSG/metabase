@@ -1,21 +1,48 @@
+---
+title: "Activity"
+summary: |
+  API endpoints for Activity.
+---
+
 # Activity
 
-  - [GET /api/activity/](#get-apiactivity)
-  - [GET /api/activity/popular_items](#get-apiactivitypopular_items)
-  - [GET /api/activity/recent_views](#get-apiactivityrecent_views)
+API endpoints for Activity.
 
-## `GET /api/activity/`
+## `GET /api/activity/most_recently_viewed_dashboard`
 
-Get recent activity.
+Get the most recently viewed dashboard for the current user. Returns a 204 if the user has not viewed any dashboards
+   in the last 24 hours.
 
 ## `GET /api/activity/popular_items`
 
-Get the list of 5 popular things for the current user. Query takes 8 and limits to 5 so that if it
-  finds anything archived, deleted, etc it can hopefully still get 5.
+Get the list of 5 popular things on the instance. Query takes 8 and limits to 5 so that if it finds anything
+  archived, deleted, etc it can usually still get 5. .
 
 ## `GET /api/activity/recent_views`
 
-Get the list of 5 things the current user has been viewing most recently.
+Get a list of 100 models (cards, models, tables, dashboards, and collections) that the current user has been viewing most
+  recently. Return a maximum of 20 model of each, if they've looked at at least 20.
+
+## `GET /api/activity/recents`
+
+Get a list of recent items the current user has been viewing most recently under the `:recents` key.
+  Allows for filtering by context: views or selections.
+
+### PARAMS:
+
+-  **`context`** vector of enum of :selections, :views.
+
+## `POST /api/activity/recents`
+
+Adds a model to the list of recently selected items.
+
+### PARAMS:
+
+-  **`model`** enum of :card, :dataset, :metric, :dashboard, :table, :collection.
+
+-  **`model_id`** value must be an integer greater than zero.
+
+-  **`context`** enum of :selection.
 
 ---
 

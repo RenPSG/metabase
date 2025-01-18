@@ -1,10 +1,13 @@
 import styled from "@emotion/styled";
+
 import Button from "metabase/core/components/Button";
 
 export const ButtonGroupRoot = styled.div`
   display: inline-block;
 
   ${Button.Root} {
+    border: 1px solid var(--mb-color-border);
+
     &:not(:last-of-type) {
       border-right-width: 0.5px;
       border-top-right-radius: 0;

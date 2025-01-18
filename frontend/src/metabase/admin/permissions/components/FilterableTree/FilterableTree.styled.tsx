@@ -1,4 +1,5 @@
 import styled from "@emotion/styled";
+
 import { Tree } from "metabase/components/tree";
 import { color, lighten } from "metabase/lib/colors";
 
@@ -19,7 +20,7 @@ export const FilterInputContainer = styled.div`
 export const ItemGroupsDivider = styled.hr`
   margin: 1rem 1.5rem;
   border: 0;
-  border-top: 1px solid ${color("border")};
+  border-top: 1px solid var(--mb-color-border);
 `;
 
 export const EmptyStateContainer = styled.div`
@@ -27,12 +28,12 @@ export const EmptyStateContainer = styled.div`
 `;
 
 export const AdminTreeNode = styled(Tree.Node)`
-  color: ${props => (props.isSelected ? color("white") : color("text-medium"))};
-
-  background-color: ${props => (props.isSelected ? color("accent7") : "unset")};
+  color: ${props =>
+    props.isSelected ? color("text-white") : color("text-medium")};
+  background-color: ${props => (props.isSelected ? color("filter") : "unset")};
 
   &:hover {
     background-color: ${props =>
-      props.isSelected ? color("accent7") : lighten(color("accent7"), 0.6)};
+      props.isSelected ? color("filter") : lighten(color("filter"), 0.6)};
   }
 `;

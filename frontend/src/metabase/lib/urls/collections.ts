@@ -1,17 +1,21 @@
 import slugg from "slugg";
 
-import { Collection as BaseCollection, CollectionId } from "metabase-types/api";
+import {
+  isRootPersonalCollection,
+  isRootTrashCollection,
+} from "metabase/collections/utils";
+import type {
+  Collection as BaseCollection,
+  CollectionId,
+} from "metabase-types/api";
 
 import { appendSlug, extractEntityId } from "./utils";
-
-export const newCollection = (collectionId: CollectionId) =>
-  `/collection/${collectionId}/new_collection`;
 
 export const otherUsersPersonalCollections = () => "/collection/users";
 
 type Collection = Pick<
   BaseCollection,
-  "id" | "name" | "originalName" | "personal_owner_id"
+  "id" | "name" | "originalName" | "personal_owner_id" | "type"
 >;
 
 function slugifyPersonalCollection(collection: Collection) {
@@ -34,7 +38,9 @@ function slugifyPersonalCollection(collection: Collection) {
   return slug;
 }
 
-export function collection(collection?: Collection) {
+export function collection(
+  collection?: Pick<Collection, "id" | "type" | "name">,
+) {
   const isSystemCollection =
     !collection || collection.id === null || typeof collection.id === "string";
 
@@ -43,8 +49,11 @@ export function collection(collection?: Collection) {
     return `/collection/${id}`;
   }
 
-  const isPersonalCollection = typeof collection.personal_owner_id === "number";
-  const slug = isPersonalCollection
+  if (isRootTrashCollection(collection)) {
+    return `/trash`;
+  }
+
+  const slug = isRootPersonalCollection(collection)
     ? slugifyPersonalCollection(collection)
     : slugg(collection.name);
 
@@ -55,7 +64,7 @@ export function isCollectionPath(path: string) {
   return /collection\/.*/.test(path);
 }
 
-export function extractCollectionId(slug = "") {
+export function extractCollectionId(slug = ""): CollectionId | undefined {
   if (slug === "root" || slug === "users") {
     return slug;
   }

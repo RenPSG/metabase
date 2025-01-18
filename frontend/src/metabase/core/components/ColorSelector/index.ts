@@ -1,1 +1,1 @@
-export { default } from "./ColorSelector";
+export { ColorSelector } from "./ColorSelector";

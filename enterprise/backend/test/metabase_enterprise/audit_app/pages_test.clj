@@ -1,65 +1,21 @@
 (ns metabase-enterprise.audit-app.pages-test
-  (:require [clojure.java.classpath :as classpath]
-            [clojure.java.io :as io]
-            [clojure.string :as str]
-            [clojure.test :refer :all]
-            [clojure.tools.namespace.find :as ns.find]
-            [clojure.tools.reader :as tools.reader]
-            [metabase-enterprise.audit-app.interface :as audit.i]
-            [metabase.models :refer [Card Dashboard DashboardCard Database Table]]
-            [metabase.models.permissions :as perms]
-            [metabase.plugins.classloader :as classloader]
-            [metabase.public-settings.premium-features-test :as premium-features-test]
-            [metabase.query-processor :as qp]
-            [metabase.query-processor.util :as qp.util]
-            [metabase.test :as mt]
-            [metabase.test.fixtures :as fixtures]
-            [metabase.util :as u]
-            [ring.util.codec :as codec]
-            [schema.core :as s]))
+  (:require
+   [clojure.java.classpath :as classpath]
+   [clojure.java.io :as io]
+   [clojure.string :as str]
+   [clojure.test :refer :all]
+   [clojure.tools.namespace.find :as ns.find]
+   [clojure.tools.reader :as tools.reader]
+   [metabase-enterprise.audit-app.interface :as audit.i]
+   [metabase.plugins.classloader :as classloader]
+   [metabase.query-processor :as qp]
+   [metabase.query-processor.util :as qp.util]
+   [metabase.test :as mt]
+   [metabase.test.fixtures :as fixtures]
+   [metabase.util :as u]
+   [ring.util.codec :as codec]))
 
-(use-fixtures :once (fixtures/initialize :db))
-
-(deftest preconditions-test
-  (classloader/require 'metabase-enterprise.audit-app.pages.dashboards)
-  (testing "the method should exist"
-    (is (fn? (get-method audit.i/internal-query :metabase-enterprise.audit-app.pages.dashboards/most-popular-with-avg-speed))))
-
-  (testing "test that a query will fail if not ran by an admin"
-    (premium-features-test/with-premium-features #{:audit-app}
-      (is (= {:status "failed", :error "You don't have permissions to do that."}
-             (-> (mt/user-http-request :lucky :post 202 "dataset"
-                                       {:type :internal
-                                        :fn   "metabase-enterprise.audit-app.pages.dashboards/most-popular-with-avg-speed"})
-                 (select-keys [:status :error]))))))
-
-  (testing "ok, now try to run it. Should fail because we don't have audit-app enabled"
-    (premium-features-test/with-premium-features nil
-      (is (= {:status "failed", :error "Audit App queries are not enabled on this instance."}
-             (-> (mt/user-http-request :crowberto :post 202 "dataset"
-                                       {:type :internal
-                                        :fn   "metabase-enterprise.audit-app.pages.dashboards/most-popular-with-avg-speed"})
-                 (select-keys [:status :error]))))))
-
-  (testing "non-admin users with monitoring permissions"
-    (mt/with-user-in-groups [group {:name "New Group"}
-                             user  [group]]
-      (perms/grant-application-permissions! group :monitoring)
-      (testing "still fail if advanced-permissions is disabled"
-        (premium-features-test/with-premium-features #{:audit-app}
-          (is (= {:status "failed", :error "You don't have permissions to do that."}
-                 (-> (mt/user-http-request user :post 202 "dataset"
-                                           {:type :internal
-                                            :fn   "metabase-enterprise.audit-app.pages.dashboards/most-popular-with-avg-speed"})
-                     (select-keys [:status :error]))))))
-
-      (testing "run successfully if advanced-permissions enabled)"
-        (premium-features-test/with-premium-features #{:audit-app :advanced-permissions}
-          (is (= {:status "completed"}
-                 (-> (mt/user-http-request user :post 202 "dataset"
-                                           {:type :internal
-                                            :fn   "metabase-enterprise.audit-app.pages.dashboards/most-popular-with-avg-speed"})
-                     (select-keys [:status])))))))))
+(use-fixtures :once (fixtures/initialize :db :test-users))
 
 (defn- all-query-methods
   "Return a set of all audit/internal query types (excluding test/`:default` impls)."
@@ -95,7 +51,7 @@
                               {:namespace ns-symb, :file file}))
 
               (and (seq? form)
-                   (#{'defmethod 's/defmethod} (first form))
+                   (#{'defmethod 'mu/defmethod} (first form))
                    (= (second form) 'audit.i/internal-query)
                    (= (nth form 2) query-type))
               form
@@ -166,16 +122,15 @@
   [query-type objects]
   (doseq [query (test-query-maps query-type objects)]
     (testing (format "\nquery =\n%s" (u/pprint-to-str query))
-      (is (schema= {:status (s/eq :completed)
-                    s/Keyword s/Any}
-                   (qp/process-query query))))))
+      (is (=? {:status :completed}
+              (qp/process-query (mt/userland-query query)))))))
 
 (defn- do-with-temp-objects [f]
-  (mt/with-temp* [Database      [database]
-                  Table         [table {:db_id (u/the-id database)}]
-                  Card          [card {:table_id (u/the-id table), :database_id (u/the-id database)}]
-                  Dashboard     [dash]
-                  DashboardCard [_ {:card_id (u/the-id card), :dashboard_id (u/the-id dash)}]]
+  (mt/with-temp [:model/Database      database {}
+                 :model/Table         table    {:db_id (u/the-id database)}
+                 :model/Card          card     {:table_id (u/the-id table), :database_id (u/the-id database)}
+                 :model/Dashboard     dash     {}
+                 :model/DashboardCard _        {:card_id (u/the-id card), :dashboard_id (u/the-id dash)}]
     (f {:database database, :table table, :card card, :dash dash})))
 
 (defmacro ^:private with-temp-objects [[objects-binding] & body]
@@ -184,7 +139,7 @@
 (deftest all-queries-test
   (mt/with-test-user :crowberto
     (with-temp-objects [objects]
-      (premium-features-test/with-premium-features #{:audit-app}
+      (mt/with-premium-features #{:audit-app}
         (doseq [query-type (all-query-methods)]
           (testing query-type
             (do-tests-for-query-type query-type objects)))))))

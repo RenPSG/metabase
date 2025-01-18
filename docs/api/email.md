@@ -1,10 +1,12 @@
+---
+title: "Email"
+summary: |
+  /api/email endpoints.
+---
+
 # Email
 
 /api/email endpoints.
-
-  - [DELETE /api/email/](#delete-apiemail)
-  - [POST /api/email/test](#post-apiemailtest)
-  - [PUT /api/email/](#put-apiemail)
 
 ## `DELETE /api/email/`
 
@@ -21,7 +23,7 @@ Update multiple email Settings. You must be a superuser or have `setting` permis
 
 ### PARAMS:
 
-*  **`settings`** value must be a map.
+-  **`settings`** map.
 
 ---
 

@@ -1,38 +1,36 @@
-import React from "react";
-import styled from "@emotion/styled";
 import { css } from "@emotion/react";
+import styled from "@emotion/styled";
 
-import Icon from "metabase/components/Icon";
 import { TreeNode } from "metabase/components/tree/TreeNode";
-import Tooltip from "metabase/components/Tooltip";
 import Link from "metabase/core/components/Link";
-
+import { alpha, color, darken } from "metabase/lib/colors";
 import { NAV_SIDEBAR_WIDTH } from "metabase/nav/constants";
+import { Icon, Tooltip } from "metabase/ui";
 
-import { darken, color, lighten } from "metabase/lib/colors";
-
-export const SidebarIcon = styled(Icon)<{
+export const SidebarIcon = styled(Icon, {
+  shouldForwardProp: propName => propName !== "isSelected",
+})<{
   color?: string | null;
   isSelected: boolean;
 }>`
   ${props =>
     !props.color &&
     css`
-      color: ${props.isSelected ? color("brand") : color("brand-light")};
+      color: var(--mb-color-brand);
     `}
 `;
 
 SidebarIcon.defaultProps = {
-  size: 14,
+  size: 16,
 };
 
 export const ExpandToggleButton = styled(TreeNode.ExpandToggleButton)`
   padding: 4px 0 4px 2px;
-  color: ${color("brand-light")};
+  color: var(--mb-color-brand);
 `;
 
 const activeColorCSS = css`
-  color: ${color("brand")};
+  color: var(--mb-color-brand);
 `;
 
 function getTextColor(isSelected: boolean) {
@@ -43,10 +41,8 @@ export const NodeRoot = styled(TreeNode.Root)<{
   hasDefaultIconStyle?: boolean;
 }>`
   color: ${props => getTextColor(props.isSelected)};
-
   background-color: ${props =>
-    props.isSelected ? lighten(color("brand"), 0.6) : "unset"};
-
+    props.isSelected ? alpha("brand", 0.2) : "unset"};
   padding-left: ${props => props.depth}rem;
   border-radius: 4px;
 
@@ -55,13 +51,17 @@ export const NodeRoot = styled(TreeNode.Root)<{
   }
 
   &:hover {
-    background-color: ${lighten(color("brand"), 0.6)};
-    color: ${color("brand")};
+    background-color: ${() => alpha("brand", 0.35)};
+    color: var(--mb-color-brand);
 
     ${ExpandToggleButton} {
-      color: ${color("brand")};
+      color: var(--mb-color-brand);
     }
+  }
 
+  &:hover,
+  &:focus,
+  &:focus-within {
     ${SidebarIcon} {
       ${props => props.hasDefaultIconStyle && activeColorCSS};
     }
@@ -72,13 +72,13 @@ NodeRoot.defaultProps = {
   hasDefaultIconStyle: true,
 };
 
+const collectionDragAndDropHoverStyle = css`
+  color: var(--mb-color-text-white);
+  background-color: var(--mb-color-brand);
+`;
+
 export const CollectionNodeRoot = styled(NodeRoot)<{ hovered?: boolean }>`
-  ${props =>
-    props.hovered &&
-    css`
-      color: ${color("text-white")};
-      background-color: ${color("brand")};
-    `}
+  ${props => props.hovered && collectionDragAndDropHoverStyle}
 `;
 
 const itemContentStyle = css`
@@ -88,16 +88,17 @@ const itemContentStyle = css`
 `;
 
 export const FullWidthButton = styled.button<{ isSelected: boolean }>`
+  color: inherit;
   cursor: pointer;
-  ${itemContentStyle}
 
+  ${itemContentStyle}
   ${TreeNode.NameContainer} {
     font-weight: 700;
-    color: ${props => getTextColor(props.isSelected)};
+    color: ${props => (props.isSelected ? color("brand") : "inherit")};
     text-align: start;
 
     &:hover {
-      color: ${color("brand")};
+      color: var(--mb-color-brand);
     }
   }
 `;
@@ -109,9 +110,8 @@ export const FullWidthLink = styled(Link)`
 const ITEM_NAME_LENGTH_TOOLTIP_THRESHOLD = 35;
 const ITEM_NAME_LABEL_WIDTH = Math.round(parseInt(NAV_SIDEBAR_WIDTH, 10) * 0.7);
 
-const ItemName = styled(TreeNode.NameContainer)`
+export const ItemName = styled(TreeNode.NameContainer)`
   width: ${ITEM_NAME_LABEL_WIDTH}px;
-  padding: 6px 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -120,10 +120,13 @@ const ItemName = styled(TreeNode.NameContainer)`
 export function NameContainer({ children: itemName }: { children: string }) {
   if (itemName.length >= ITEM_NAME_LENGTH_TOOLTIP_THRESHOLD) {
     return (
-      <Tooltip tooltip={itemName} maxWidth="none">
+      <Tooltip label={itemName} withArrow maw="none">
         <ItemName>{itemName}</ItemName>
       </Tooltip>
     );
   }
   return <TreeNode.NameContainer>{itemName}</TreeNode.NameContainer>;
 }
+
+export const LeftElementContainer = styled.div``;
+export const RightElementContainer = styled.div``;

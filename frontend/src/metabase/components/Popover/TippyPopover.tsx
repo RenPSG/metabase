@@ -1,17 +1,19 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
-import PropTypes from "prop-types";
 import * as TippyReact from "@tippyjs/react";
-import * as tippy from "tippy.js";
 import cx from "classnames";
 import { merge } from "icepick";
+import { useCallback, useMemo, useState } from "react";
+import type * as tippy from "tippy.js";
 
-import { isReducedMotionPreferred } from "metabase/lib/dom";
 import EventSandbox from "metabase/components/EventSandbox";
+import { getPortalRootElement } from "metabase/css/core/overlays/utils";
+import ZIndex from "metabase/css/core/z-index.module.css";
 import { isCypressActive } from "metabase/env";
 import useSequencedContentCloseHandler from "metabase/hooks/use-sequenced-content-close-handler";
+import { isReducedMotionPreferred } from "metabase/lib/dom";
+import { useMantineTheme } from "metabase/ui";
 
-import { DEFAULT_Z_INDEX } from "./constants";
-import { sizeToFitModifierFn, SizeToFitOptions } from "./SizeToFitModifier";
+import type { SizeToFitOptions } from "./SizeToFitModifier";
+import { sizeToFitModifierFn } from "./SizeToFitModifier";
 
 const TippyComponent = TippyReact.default;
 type TippyProps = TippyReact.TippyProps;
@@ -26,16 +28,6 @@ export interface ITippyPopoverProps extends TippyProps {
 }
 
 const OFFSET: [number, number] = [0, 5];
-
-const propTypes = {
-  disablContentSandbox: PropTypes.bool,
-  lazy: PropTypes.bool,
-  ...TippyComponent.propTypes,
-};
-
-function appendTo() {
-  return document.body;
-}
 
 function getPopperOptions({
   flip,
@@ -63,6 +55,9 @@ function getPopperOptions({
   );
 }
 
+/**
+ * @deprecated prefer Popover from "metabase/ui" instead
+ */
 function TippyPopover({
   className,
   disableContentSandbox,
@@ -84,10 +79,10 @@ function TippyPopover({
   const shouldShowContent = mounted && content != null;
   const isControlled = props.visible != null;
 
-  const {
-    setupCloseHandler,
-    removeCloseHandler,
-  } = useSequencedContentCloseHandler();
+  const theme = useMantineTheme();
+
+  const { setupCloseHandler, removeCloseHandler } =
+    useSequencedContentCloseHandler();
 
   const handleShow = useCallback(
     (instance: TippyInstance) => {
@@ -131,14 +126,18 @@ function TippyPopover({
     [flip, sizeToFit, popperOptions],
   );
 
+  const zIndex =
+    theme.other.popover?.zIndex ||
+    ("var(--mb-overlay-z-index)" as unknown as number);
+
   return (
     <TippyComponent
-      className={cx("popover", className)}
+      className={cx("popover", ZIndex.Overlay, className)}
       theme="popover"
-      zIndex={DEFAULT_Z_INDEX}
+      zIndex={zIndex}
       arrow={false}
       offset={OFFSET}
-      appendTo={appendTo}
+      appendTo={getPortalRootElement}
       plugins={plugins}
       {...props}
       popperOptions={computedPopperOptions}
@@ -158,6 +157,5 @@ function TippyPopover({
   );
 }
 
-TippyPopover.propTypes = propTypes;
-
+// eslint-disable-next-line import/no-default-export -- deprecated usage
 export default TippyPopover;

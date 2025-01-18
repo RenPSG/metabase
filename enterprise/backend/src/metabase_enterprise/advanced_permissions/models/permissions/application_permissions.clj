@@ -1,23 +1,27 @@
 (ns metabase-enterprise.advanced-permissions.models.permissions.application-permissions
   "Code for generating and updating the Application Permission graph. See [[metabase.models.permissions]] for more
   details and for the code for generating and updating the *data* permissions graph."
-  (:require [clojure.data :as data]
-            [metabase.models :refer [ApplicationPermissionsRevision Permissions]]
-            [metabase.models.application-permissions-revision :as a-perm-revision]
-            [metabase.models.permissions :as perms]
-            [metabase.util.honeysql-extensions :as hx]
-            [metabase.util.schema :as su]
-            [schema.core :as s]
-            [toucan.db :as db]))
+  (:require
+   [clojure.data :as data]
+   [metabase.models.application-permissions-revision :as a-perm-revision]
+   [metabase.models.permissions :as perms]
+   [metabase.permissions.util :as perms.u]
+   [metabase.util.honey-sql-2 :as h2x]
+   [metabase.util.malli :as mu]
+   [metabase.util.malli.schema :as ms]
+   [toucan2.core :as t2]))
 
 ;;; ---------------------------------------------------- Schemas -----------------------------------------------------
 
 (def ^:private GroupPermissionsGraph
-  {(s/enum :setting :monitoring :subscription) (s/enum :yes :no)})
+  [:map-of
+   [:enum :setting :monitoring :subscription]
+   [:enum :yes :no]])
 
 (def ^:private ApplicationPermissionsGraph
-  {:revision s/Int
-   :groups   {su/IntGreaterThanZero GroupPermissionsGraph}})
+  [:map {:closed true}
+   [:revision :int]
+   [:groups [:map-of ms/PositiveInt GroupPermissionsGraph]]])
 
 ;; -------------------------------------------------- Fetch Graph ---------------------------------------------------
 
@@ -25,10 +29,10 @@
   "Returns a map of group-id -> application permissions paths.
   Only groups that has at least one application permission enabled will be included."
   []
-  (let [application-permissions (db/select Permissions
-                                       {:where [:or
-                                                [:= :object "/"]
-                                                [:like :object (hx/literal "/application/%")]]})]
+  (let [application-permissions (t2/select :model/Permissions
+                                           {:where [:or
+                                                    [:= :object "/"]
+                                                    [:like :object (h2x/literal "/application/%")]]})]
     (into {} (for [[group-id perms] (group-by :group_id application-permissions)]
                {group-id (set (map :object perms))}))))
 
@@ -38,14 +42,14 @@
     :yes
     :no))
 
-(s/defn permissions-set->application-perms :- GroupPermissionsGraph
+(mu/defn permissions-set->application-perms :- GroupPermissionsGraph
   "Get a map of all application permissions for a group."
   [permission-set]
   {:setting      (permission-for-type permission-set :setting)
    :monitoring   (permission-for-type permission-set :monitoring)
    :subscription (permission-for-type permission-set :subscription)})
 
-(s/defn graph :- ApplicationPermissionsGraph
+(mu/defn graph :- ApplicationPermissionsGraph
   "Fetch a graph representing the application permissions status for groups that has at least one application permission enabled.
   This works just like the function of the same name in `metabase.models.permissions`;
   see also the documentation for that function."
@@ -67,19 +71,23 @@
       :no
       (perms/revoke-application-permissions! group-id perm-type))))
 
-(s/defn update-graph!
+(mu/defn update-graph!
   "Update the application Permissions graph.
-  This works just like [[metabase.models.permission/update-data-perms-graph!]], but for Application permissions;
+  This works just like [[metabase.models.data-permissions.graph/update-data-perms-graph!]], but for Application permissions;
   refer to that function's extensive documentation to get a sense for how this works."
-  [new-graph :- ApplicationPermissionsGraph]
-  (let [old-graph          (graph)
-        old-perms          (:groups old-graph)
-        new-perms          (:groups new-graph)
-        [diff-old changes] (data/diff old-perms new-perms)]
-    (perms/log-permissions-changes diff-old changes)
-    (perms/check-revision-numbers old-graph new-graph)
-    (when (seq changes)
-      (db/transaction
-       (doseq [[group-id changes] changes]
-         (update-application-permissions! group-id changes))
-       (perms/save-perms-revision! ApplicationPermissionsRevision (:revision old-graph) (:groups old-graph) changes)))))
+  ([new-graph :- ApplicationPermissionsGraph]
+   (update-graph! new-graph false))
+
+  ([new-graph :- ApplicationPermissionsGraph
+    force?     :- :boolean]
+   (let [old-graph          (graph)
+         old-perms          (:groups old-graph)
+         new-perms          (:groups new-graph)
+         [diff-old changes] (data/diff old-perms new-perms)]
+     (perms.u/log-permissions-changes diff-old changes)
+     (when-not force? (perms.u/check-revision-numbers old-graph new-graph))
+     (when (seq changes)
+       (t2/with-transaction [_conn]
+         (doseq [[group-id changes] changes]
+           (update-application-permissions! group-id changes))
+         (perms.u/save-perms-revision! :model/ApplicationPermissionsRevision (:revision old-graph) (:groups old-graph) changes))))))

@@ -1,25 +1,27 @@
 (ns metabase.models.permissions-revision
-  (:require [metabase.util :as u]
-            [metabase.util.i18n :refer [tru]]
-            [toucan.db :as db]
-            [toucan.models :as models]))
+  (:require
+   [metabase.models.interface :as mi]
+   [metabase.util.i18n :refer [tru]]
+   [methodical.core :as methodical]
+   [toucan2.core :as t2]))
 
-(models/defmodel PermissionsRevision :permissions_revision)
+(methodical/defmethod t2/table-name :model/PermissionsRevision [_model] :permissions_revision)
 
-(defn- pre-insert [revision]
-  (assoc revision :created_at :%now))
+(doto :model/PermissionsRevision
+  (derive :metabase/model)
+  (derive :hook/created-at-timestamped?))
 
-(u/strict-extend (class PermissionsRevision)
-  models/IModel
-  (merge models/IModelDefaults
-         {:types      (constantly {:before :json
-                                   :after  :json})
-          :pre-insert pre-insert
-          :pre-update (fn [& _] (throw (Exception. (tru "You cannot update a PermissionsRevision!"))))}))
+(t2/deftransforms :model/PermissionsRevision
+  {:before mi/transform-json
+   :after  mi/transform-json})
+
+(t2/define-before-update :model/PermissionsRevision
+  [_]
+  (throw (Exception. (tru "You cannot update a PermissionsRevision!"))))
 
 (defn latest-id
   "Return the ID of the newest `PermissionsRevision`, or zero if none have been made yet.
    (This is used by the permissions graph update logic that checks for changes since the original graph was fetched)."
   []
-  (or (db/select-one-id PermissionsRevision {:order-by [[:id :desc]]})
+  (or (t2/select-one-pk :model/PermissionsRevision {:order-by [[:id :desc]]})
       0))

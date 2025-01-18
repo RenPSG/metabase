@@ -1,16 +1,23 @@
 (ns metabase.query-processor.middleware.persistence
-  (:require [metabase.mbql.util :as mbql.u]
-            [metabase.query-processor.middleware.permissions :as qp.perms]))
+  (:require
+   [metabase.api.common :as api]
+   [metabase.lib.util.match :as lib.util.match]
+   [metabase.models.query.permissions :as query-perms]
+   [metabase.permissions.util :as perms-util]))
 
 (defn substitute-persisted-query
-  "Replaces source-query with the native query to the cache table.
-   `:persisted-info/native` is set in `fetch-source-query`.
+  "Removes persisted information if user is sandboxed or uses connection impersonation. `:persisted-info/native` is set
+  in [[metabase.query-processor.middleware.fetch-source-query]].
 
-   If permissions are applied to the query (sandboxing) then do not use the cached query.
-   It may be be possible to use the persistence cache with sandboxing at a later date with further work."
-  [{::qp.perms/keys [perms] :as  query}]
-  (if perms
-    query
-    (mbql.u/replace query
+  Sandboxing is detected by the presence of the ::query-perms/perms key added by row-level-restrictions middleware.
+
+  It may be be possible to use the persistence cache with sandboxing and/or impersonation at a later date with further
+  work, but for now we skip the cache in these cases."
+  [{::query-perms/keys [perms] :as query}]
+  (if (and api/*current-user-id*
+           (or perms ;; sandboxed?
+               (perms-util/impersonation-enforced-for-db? (:database query))))
+    (lib.util.match/replace query
       (x :guard (every-pred map? :persisted-info/native))
-      {:native (:persisted-info/native x)})))
+      (dissoc x :persisted-info/native))
+    query))
